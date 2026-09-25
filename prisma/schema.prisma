@@ -1,0 +1,192 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Admin {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         String   @default("SUPER_ADMIN")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model User {
+  id           String     @id @default(uuid())
+  name         String
+  mobile       String
+  email        String     @unique
+  passwordHash String
+  role         String     // "BUYER", "SELLER", "DEALER", "COMMON_PEOPLE"
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  properties   Property[]
+}
+
+model Category {
+  id           String   @id @default(uuid())
+  name         String
+  slug         String   @unique
+  description  String?
+  imageUrl     String?
+  isActive     Boolean  @default(true)
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Property {
+  id            String          @id @default(uuid())
+  title         String
+  category      String
+  description   String?
+  location      String
+  city          String?
+  price         Float
+  priceDisplay  String?
+  status        String          @default("PENDING") // "PENDING", "APPROVED", "REJECTED", "HOLD"
+  planType      String          @default("PLATINUM") // "PLATINUM", "GOLD", "STANDARD"
+  sellerId      String?
+  sellerName    String?
+  sellerPhone   String?
+  sellerEmail   String?
+  sellerRole    String?         @default("SELLER") // "SELLER", "DEALER", "COMMON_PEOPLE"
+  dealerCompany String?
+  categorySpecs String?         // JSON serialized specs
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  images        PropertyImage[]
+  seller        User?           @relation(fields: [sellerId], references: [id], onDelete: SetNull)
+  bookings      PropertyBooking[]
+}
+
+model PropertyBooking {
+  id               String    @id @default(uuid())
+  propertyId       String
+  propertyTitle    String
+  propertyCategory String?
+  propertyPrice    Float?
+  planType         String    @default("PLATINUM") // "GOLD" or "PREMIUM" / "PLATINUM"
+  bookerRole       String    @default("DEALER") // "BUYER", "DEALER"
+  bookerId         String?
+  bookerName       String?
+  bookerEmail      String?
+  bookerPhone      String?
+  dealerId         String?
+  dealerName       String?
+  dealerCompany    String?
+  dealerEmail      String?
+  dealerPhone      String?
+  sellerId         String?
+  sellerName       String?
+  sellerEmail      String?
+  sellerPhone      String?
+  bookingAmount    Float?    @default(0)
+  bookingStatus    String    @default("CONFIRMED") // "PENDING", "CONFIRMED", "COMPLETED", "CANCELLED"
+  notes            String?
+  bookingDate      DateTime  @default(now())
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  property         Property? @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+}
+
+model PropertyImage {
+  id           String   @id @default(uuid())
+  propertyId   String
+  imageUrl     String
+  isPrimary    Boolean  @default(false)
+  displayOrder Int      @default(0)
+  property     Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+}
+
+model Plan {
+  id          String   @id @default(uuid())
+  planId      String   @unique // "gold", "platinum"
+  name        String
+  price       Float
+  description String?
+  benefits    String?  // JSON array
+  features    String?  // JSON array
+  isActive    Boolean  @default(true)
+  content     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Reward {
+  id            String   @id @default(uuid())
+  userName      String
+  userEmail     String?
+  userRole      String?  @default("COMMON_PEOPLE") // "DEALER", "COMMON_PEOPLE", "SELLER"
+  propertyTitle String?
+  rewardTitle   String
+  points        Int      @default(0)
+  amount        Float    @default(0)
+  reason        String?
+  status        String   @default("PENDING") // "PENDING", "APPROVED", "PAID", "REJECTED"
+  date          DateTime @default(now())
+  createdAt     DateTime @default(now())
+}
+
+model Report {
+  id            String   @id @default(uuid())
+  propertyId    String?
+  propertyTitle String?
+  category      String?
+  userName      String?
+  userEmail     String?
+  userPhone     String?
+  reason        String
+  description   String
+  status        String   @default("PENDING") // "PENDING", "RESOLVED", "REJECTED"
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model VerifiedPartner {
+  id           String   @id @default(uuid())
+  name         String
+  type         String   // "Agency", "Broker", "Developer", "Consultant"
+  company      String?
+  mobile       String
+  email        String
+  status       String   @default("PENDING") // "PENDING", "APPROVED", "REJECTED"
+  registeredAt DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model WebsiteSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  group     String   // "home", "about", "service", "logo", "contact"
+  updatedAt DateTime @updatedAt
+}
+
+model Chat {
+  id             String   @id @default(uuid())
+  userName       String
+  userEmail      String?
+  userAvatar     String?
+  previewMessage String
+  isRead         Boolean  @default(false)
+  lastMessageAt  DateTime @default(now())
+  messages       String?  // JSON array of message objects
+}
+
+model CalendarEvent {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  eventDate   DateTime
+  eventType   String   @default("REMINDER") // "INSPECTION", "MEETING", "REMINDER", "DEADLINE"
+  isCompleted Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
