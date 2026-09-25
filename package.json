@@ -4,6 +4,7 @@
   "description": "NestJS REST API Backend with PostgreSQL and Prisma ORM",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "build:render": "node render-build.js",
     "start": "node dist/main",
     "start:dev": "ts-node src/main.ts",
     "prisma:generate": "prisma generate",
