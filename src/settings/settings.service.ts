@@ -69,8 +69,7 @@ export class SettingsService {
           const filePath = path.join(uploadsDir, savedName);
           // FIX: actually write the file to disk (was missing before — URL was stored but file never existed)
           fs.writeFileSync(filePath, buffer);
-          const port = process.env.PORT || 5001;
-          logoUrl = `http://localhost:${port}/uploads/${savedName}`;
+          logoUrl = `/uploads/${savedName}`;
         }
       }
     } catch (err) {
