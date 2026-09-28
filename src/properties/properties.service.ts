@@ -1,5 +1,34 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import * as fs from 'fs';
+import * as path from 'path';
+
+function saveBase64Image(dataUrl: string): string {
+  if (!dataUrl || typeof dataUrl !== 'string') {
+    return 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80';
+  }
+  const trimmed = dataUrl.trim();
+  if (trimmed.startsWith('data:image/')) {
+    try {
+      const matches = trimmed.match(/^data:image\/([a-zA-Z0-9+.-]+);base64,(.+)$/);
+      if (matches) {
+        const rawExt = matches[1].toLowerCase();
+        const ext = rawExt.includes('png') ? 'png' : rawExt.includes('webp') ? 'webp' : 'jpg';
+        const buffer = Buffer.from(matches[2], 'base64');
+        const uploadsDir = path.join(process.cwd(), 'uploads');
+        if (!fs.existsSync(uploadsDir)) {
+          fs.mkdirSync(uploadsDir, { recursive: true });
+        }
+        const fileName = `prop-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+        fs.writeFileSync(path.join(uploadsDir, fileName), buffer);
+        return `/uploads/${fileName}`;
+      }
+    } catch {
+      return 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80';
+    }
+  }
+  return trimmed;
+}
 
 @Injectable()
 export class PropertiesService {
@@ -391,6 +420,10 @@ export class PropertiesService {
         const planNormalized = (p.planType || 'PLATINUM').toUpperCase();
         const tier = planNormalized === 'GOLD' ? 'gold' : 'platinum';
 
+        const rawMain = p.images[0]?.imageUrl;
+        const mainImage = rawMain ? saveBase64Image(rawMain) : 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80';
+        const galleryImages = (p.images || []).map(img => saveBase64Image(img.imageUrl));
+
         return {
           id: p.id,
           title: p.title,
@@ -403,8 +436,8 @@ export class PropertiesService {
           location: p.location,
           city: p.city,
           description: p.description,
-          imageUrl: p.images[0]?.imageUrl || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80',
-          galleryImages: p.images.map(img => img.imageUrl),
+          imageUrl: mainImage,
+          galleryImages: galleryImages,
           specs,
           sellerName: p.sellerName || 'Verified Partner',
           sellerPhone: p.sellerPhone,
