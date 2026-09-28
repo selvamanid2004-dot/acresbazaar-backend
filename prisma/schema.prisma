@@ -18,16 +18,20 @@ model Admin {
 }
 
 model User {
-  id           String     @id @default(uuid())
+  id           String         @id @default(uuid())
   name         String
   mobile       String
-  email        String     @unique
+  email        String         @unique
   passwordHash String
-  role         String     // "BUYER", "SELLER", "DEALER", "COMMON_PEOPLE"
-  isActive     Boolean    @default(true)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  role         String         // "BUYER", "SELLER", "DEALER", "COMMON_PEOPLE"
+  isActive     Boolean        @default(true)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
   properties   Property[]
+  activities   UserActivity[]
+
+  @@index([email])
+  @@index([role, isActive])
 }
 
 model Category {
@@ -40,6 +44,9 @@ model Category {
   displayOrder Int      @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  @@index([slug])
+  @@index([isActive, displayOrder])
 }
 
 model Property {
@@ -65,6 +72,12 @@ model Property {
   images        PropertyImage[]
   seller        User?           @relation(fields: [sellerId], references: [id], onDelete: SetNull)
   bookings      PropertyBooking[]
+
+  @@index([status, city])
+  @@index([category, status])
+  @@index([price])
+  @@index([sellerId])
+  @@index([createdAt])
 }
 
 model PropertyBooking {
@@ -95,6 +108,11 @@ model PropertyBooking {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   property         Property? @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId])
+  @@index([sellerId])
+  @@index([bookerId])
+  @@index([bookingStatus])
 }
 
 model PropertyImage {
@@ -104,6 +122,8 @@ model PropertyImage {
   isPrimary    Boolean  @default(false)
   displayOrder Int      @default(0)
   property     Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId])
 }
 
 model Plan {
@@ -189,4 +209,19 @@ model CalendarEvent {
   eventType   String   @default("REMINDER") // "INSPECTION", "MEETING", "REMINDER", "DEADLINE"
   isCompleted Boolean  @default(false)
   createdAt   DateTime @default(now())
+}
+
+model UserActivity {
+  id          String   @id @default(uuid())
+  userId      String?
+  userRole    String?  @default("BUYER") // "BUYER", "SELLER", "DEALER", "ANONYMOUS"
+  actionType  String   // "VIEW_PROPERTY", "SEARCH", "FILTER", "SAVE_WISHLIST", "CONTACT_SELLER", "SUBMIT_PROPERTY"
+  entityId    String?  // e.g. propertyId
+  details     String?  // JSON serialized context or search query
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, actionType])
+  @@index([actionType, createdAt])
 }

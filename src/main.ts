@@ -7,9 +7,14 @@ import { join } from 'path';
 import * as fs from 'fs';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Set Winston as the application logger
+  const winstonLogger = app.get(WINSTON_MODULE_NEST_PROVIDER);
+  app.useLogger(winstonLogger);
 
   // Ensure uploads directory exists
   const uploadsDir = join(process.cwd(), 'uploads');
@@ -26,11 +31,11 @@ async function bootstrap() {
     prefix: '/uploads/',
   });
 
-  // Enable CORS for frontend clients (Public website on 4200, Admin panel on 5173 / any)
+  // Enable CORS for frontend clients
   app.enableCors({
     origin: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    credentials: true
+    credentials: true,
   });
 
   // Global Prefix for all REST API endpoints
@@ -45,10 +50,8 @@ async function bootstrap() {
 
   const port = process.env.PORT || 5001;
   await app.listen(port, '0.0.0.0');
-  console.log(`=======================================================`);
-  console.log(`🚀 AcresBazaar NestJS REST API is listening on port ${port}`);
-  console.log(`🔗 API Base URL: http://localhost:${port}/api`);
-  console.log(`=======================================================`);
+  winstonLogger.log(`🚀 AcresBazaar NestJS REST API is listening on port ${port}`, 'Bootstrap');
+  winstonLogger.log(`🔗 API Base URL: http://localhost:${port}/api`, 'Bootstrap');
 }
 
 bootstrap();
