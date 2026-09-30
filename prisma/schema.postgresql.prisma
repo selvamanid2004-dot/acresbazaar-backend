@@ -12,7 +12,9 @@ model Admin {
   email        String   @unique
   passwordHash String
   name         String
-  role         String   @default("SUPER_ADMIN")
+  role         String   @default("SUPER_ADMIN") // "SUPER_ADMIN", "ADMIN", "STAFF"
+  isActive     Boolean  @default(true)
+  permissions  String?  // JSON string array of permission codes
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
