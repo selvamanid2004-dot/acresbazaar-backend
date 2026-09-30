@@ -62,13 +62,15 @@ export class PropertiesService {
       ];
     }
 
-    // FIX: isSnap filter must not overwrite role filter — merge with AND
+    // Property Source Rule: Snap Properties contains ONLY properties registered/posted by Partners (previously Common People)
     if (isSnap === 'true') {
-      const snapCond = { OR: [
-        { categorySpecs: { contains: '"isSnapProperty":true' } },
-        { seller: { role: 'COMMON_PEOPLE' } }
-      ]};
-      where.AND = [ ...(where.AND || []), snapCond ];
+      const snapPartnerCond = {
+        OR: [
+          { seller: { role: { in: ['COMMON_PEOPLE', 'PARTNER'] } } },
+          { sellerRole: { in: ['COMMON_PEOPLE', 'PARTNER'] } }
+        ]
+      };
+      where.AND = [ ...(where.AND || []), snapPartnerCond ];
     }
 
     if (search && search.trim()) {
@@ -113,7 +115,7 @@ export class PropertiesService {
     return { success: true, property };
   }
 
-  // 3. Create Property (Seller, Dealer, or Admin quick-post)
+  // 3. Create Property (Seller, Dealer, Partner, or Admin quick-post)
   async create(data: {
     title: string;
     category: string;
@@ -175,13 +177,20 @@ export class PropertiesService {
 
     // Serialize categorySpecs safely
     let specsStr: string | null = null;
+    let isSnapProperty = false;
     if (data.categorySpecs !== undefined && data.categorySpecs !== null) {
       specsStr = typeof data.categorySpecs === 'object' ? JSON.stringify(data.categorySpecs) : String(data.categorySpecs);
+      try {
+        const parsed = typeof data.categorySpecs === 'object' ? data.categorySpecs : JSON.parse(specsStr);
+        if (parsed?.isSnapProperty) isSnapProperty = true;
+      } catch {}
     }
 
-    // Detect if dealer listing
-    const isDealerListing = (data.sellerRole || '').toUpperCase() === 'DEALER' || !!data.dealerCompany;
-    const sellerRole = isDealerListing ? 'DEALER' : (data.sellerRole ? data.sellerRole.toUpperCase().trim() : 'SELLER');
+    // Detect role
+    const rawRole = (data.sellerRole || '').toUpperCase().trim();
+    const isDealerListing = rawRole === 'DEALER' || !!data.dealerCompany;
+    const isPartnerListing = rawRole === 'COMMON_PEOPLE' || rawRole === 'PARTNER' || isSnapProperty;
+    let sellerRole = isDealerListing ? 'DEALER' : (isPartnerListing ? (rawRole || 'COMMON_PEOPLE') : (data.sellerRole ? rawRole : 'SELLER'));
     const dealerCompany = data.dealerCompany ? data.dealerCompany.trim() : '';
 
     // Validate foreign key: check if sellerId exists in User table, or auto-link via email
@@ -200,6 +209,9 @@ export class PropertiesService {
           if (!sellerName) sellerName = userExists.name;
           if (!sellerPhone) sellerPhone = userExists.mobile;
           if (!sellerEmail) sellerEmail = userExists.email.toLowerCase();
+          if (!data.sellerRole && userExists.role) {
+            sellerRole = userExists.role;
+          }
         }
       } catch {}
     }
@@ -213,6 +225,9 @@ export class PropertiesService {
           validSellerId = userByEmail.id;
           if (!sellerName) sellerName = userByEmail.name;
           if (!sellerPhone) sellerPhone = userByEmail.mobile;
+          if (!data.sellerRole && userByEmail.role) {
+            sellerRole = userByEmail.role;
+          }
         } else if (sellerName) {
           // Auto-create user record so foreign key is valid and tracked in Customers
           const newUser = await this.prisma.user.create({
