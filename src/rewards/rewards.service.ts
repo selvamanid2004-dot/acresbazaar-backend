@@ -166,6 +166,39 @@ export class RewardsService {
     };
   }
 
+  async getSpotterRewardsSummary(email: string) {
+    if (!email) {
+      return { success: true, totalEarned: 0, availablePoints: 0, activeClaim: null, history: [] };
+    }
+    const cleanEmail = email.trim().toLowerCase();
+    const rewards = await this.prisma.reward.findMany({
+      where: {
+        userEmail: cleanEmail,
+        userRole: { in: ['COMMON_PEOPLE', 'SPOTTER', 'PARTNER'] }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    const earnedPoints = rewards
+      .filter(r => r.points > 0 && !r.rewardTitle.includes('Claim'))
+      .reduce((sum, r) => sum + r.points, 0);
+
+    const redeemedPoints = rewards
+      .filter(r => r.rewardTitle.includes('Claim') && (r.status === 'APPROVED' || r.status === 'PAID'))
+      .reduce((sum, r) => sum + r.points, 0);
+
+    const availablePoints = Math.max(0, earnedPoints - redeemedPoints);
+    const activeClaim = rewards.find(r => r.rewardTitle.includes('Claim') && (r.status === 'PENDING' || r.status === 'APPROVED'));
+
+    return {
+      success: true,
+      totalEarned: earnedPoints,
+      availablePoints,
+      activeClaim: activeClaim || null,
+      history: rewards
+    };
+  }
+
   async delete(id: string) {
     await this.prisma.reward.delete({ where: { id } });
     return { success: true, message: 'Reward deleted successfully' };

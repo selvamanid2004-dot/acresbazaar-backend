@@ -25,6 +25,12 @@ export class RewardsController {
     return this.rewardsService.getDealerRewardsSummary(email);
   }
 
+  // Spotter rewards summary (points, active claims, breakdown)
+  @Get('spotter-summary')
+  async getSpotterSummary(@Query('email') email: string) {
+    return this.rewardsService.getSpotterRewardsSummary(email);
+  }
+
   // Admin endpoints
   @UseGuards(AdminGuard, PermissionsGuard)
   @RequirePermissions('rewards')

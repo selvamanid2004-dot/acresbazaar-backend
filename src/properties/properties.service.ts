@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -354,11 +354,21 @@ export class PropertiesService {
     };
   }
 
-  // 5. Update Property Details
-  async update(id: string, data: any) {
+  // 5. Update Property Details (Strict Ownership Check for non-admin)
+  async update(id: string, data: any, user?: any) {
     const property = await this.prisma.property.findUnique({ where: { id } });
     if (!property) {
       throw new NotFoundException('Property not found');
+    }
+
+    // If user is provided and is not admin/super_admin, enforce ownership
+    if (user && user.role !== 'SUPER_ADMIN' && user.role !== 'ADMIN' && user.type !== 'admin') {
+      const isOwner = property.sellerId === user.sub || 
+                      property.sellerId === user.id || 
+                      (user.email && property.sellerEmail?.toLowerCase() === user.email.toLowerCase());
+      if (!isOwner) {
+        throw new ForbiddenException('Access denied. You do not have permission to modify this property.');
+      }
     }
 
     const specsStr = data.categorySpecs && typeof data.categorySpecs === 'object'
@@ -385,8 +395,23 @@ export class PropertiesService {
     return { success: true, message: 'Property updated successfully', property: updated };
   }
 
-  // 6. Delete Property
-  async delete(id: string) {
+  // 6. Delete Property (Strict Ownership Check for non-admin)
+  async delete(id: string, user?: any) {
+    const property = await this.prisma.property.findUnique({ where: { id } });
+    if (!property) {
+      throw new NotFoundException('Property not found');
+    }
+
+    // If user is provided and is not admin/super_admin, enforce ownership
+    if (user && user.role !== 'SUPER_ADMIN' && user.role !== 'ADMIN' && user.type !== 'admin') {
+      const isOwner = property.sellerId === user.sub || 
+                      property.sellerId === user.id || 
+                      (user.email && property.sellerEmail?.toLowerCase() === user.email.toLowerCase());
+      if (!isOwner) {
+        throw new ForbiddenException('Access denied. You do not have permission to delete this property.');
+      }
+    }
+
     await this.prisma.property.delete({ where: { id } });
     return { success: true, message: 'Property deleted successfully' };
   }
@@ -463,10 +488,18 @@ export class PropertiesService {
     };
   }
 
-  // 8. Properties submitted by logged-in Seller / Dealer
+  // 8. Properties submitted by logged-in Seller / Dealer (Strict User ID Filtering)
   async findMyProperties(sellerId: string) {
+    if (!sellerId || !sellerId.trim()) {
+      return {
+        success: true,
+        statistics: { total: 0, pending: 0, approved: 0, rejected: 0, hold: 0 },
+        properties: []
+      };
+    }
+
     const properties = await this.prisma.property.findMany({
-      where: { sellerId },
+      where: { sellerId: sellerId.trim() },
       orderBy: { createdAt: 'desc' },
       include: { images: true }
     });
@@ -493,26 +526,38 @@ export class PropertiesService {
         status: p.status,
         created_at: p.createdAt.toISOString(),
         image_urls: p.images.map(img => img.imageUrl),
-        // FIX: unguarded JSON.parse — wrap in try/catch to prevent 500 errors on bad data
         category_specs: (() => { try { return p.categorySpecs ? JSON.parse(p.categorySpecs) : {}; } catch { return {}; } })()
       }))
     };
   }
 
-  // 9. Seller Properties by filter (sellerId, email, phone)
-  async findSellerProperties(filter: { sellerId?: string; email?: string; phone?: string }) {
+  // 9. Seller Properties by filter (sellerId, email, phone) - STRICT ISOLATION
+  async findSellerProperties(filter: { sellerId?: string; email?: string; phone?: string; role?: string }) {
     const conditions: any[] = [];
     if (filter.sellerId && filter.sellerId.trim()) {
       conditions.push({ sellerId: filter.sellerId.trim() });
     }
     if (filter.email && filter.email.trim()) {
-      conditions.push({ sellerEmail: filter.email.trim() });
+      conditions.push({ sellerEmail: filter.email.trim().toLowerCase() });
     }
     if (filter.phone && filter.phone.trim()) {
       conditions.push({ sellerPhone: filter.phone.trim() });
     }
 
-    const where: any = conditions.length > 0 ? { OR: conditions } : {};
+    // STRICT USER ISOLATION: If no specific seller identifier is provided, return empty
+    if (conditions.length === 0) {
+      return {
+        success: true,
+        statistics: { total: 0, pending: 0, approved: 0, rejected: 0, hold: 0 },
+        count: 0,
+        properties: []
+      };
+    }
+
+    const where: any = { OR: conditions };
+    if (filter.role && filter.role.trim() && filter.role.toUpperCase() !== 'ALL') {
+      where.sellerRole = filter.role.trim().toUpperCase();
+    }
 
     const properties = await this.prisma.property.findMany({
       where,
@@ -676,8 +721,12 @@ export class PropertiesService {
     };
   }
 
-  // 10. Get Dealer Bookings (Filtered by email or dealerId)
+  // 10. Get Dealer Bookings (Strictly Filtered by email or dealerId)
   async findDealerBookings(dealerEmail?: string, dealerId?: string) {
+    if ((!dealerEmail || !dealerEmail.trim()) && (!dealerId || !dealerId.trim())) {
+      return { success: true, count: 0, bookings: [] };
+    }
+
     const where: any = {};
     if (dealerEmail && dealerEmail.trim()) {
       where.OR = [
@@ -690,6 +739,34 @@ export class PropertiesService {
         { bookerId: dealerId.trim() }
       ];
     }
+    where.bookerRole = 'DEALER';
+
+    const bookings = await this.prisma.propertyBooking.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        property: {
+          include: { images: true }
+        }
+      }
+    });
+
+    return { success: true, count: bookings.length, bookings };
+  }
+
+  // 10b. Get Buyer Bookings / Requests (Strictly Filtered by email or buyerId)
+  async findBuyerBookings(buyerEmail?: string, buyerId?: string) {
+    if ((!buyerEmail || !buyerEmail.trim()) && (!buyerId || !buyerId.trim())) {
+      return { success: true, count: 0, bookings: [] };
+    }
+
+    const where: any = {};
+    if (buyerEmail && buyerEmail.trim()) {
+      where.bookerEmail = buyerEmail.trim().toLowerCase();
+    } else if (buyerId && buyerId.trim()) {
+      where.bookerId = buyerId.trim();
+    }
+    where.bookerRole = 'BUYER';
 
     const bookings = await this.prisma.propertyBooking.findMany({
       where,

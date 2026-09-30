@@ -30,9 +30,10 @@ export class PropertiesController {
   async findSellerProperties(
     @Query('sellerId') sellerId?: string,
     @Query('email') email?: string,
-    @Query('phone') phone?: string
+    @Query('phone') phone?: string,
+    @Query('role') role?: string
   ) {
-    return this.propertiesService.findSellerProperties({ sellerId, email, phone });
+    return this.propertiesService.findSellerProperties({ sellerId, email, phone, role });
   }
 
   // Admin endpoint: List all properties with status tabs (PENDING, APPROVED, HOLD, REJECTED, ALL)
@@ -63,19 +64,28 @@ export class PropertiesController {
     return this.propertiesService.findAllAdmin({ status, category, search, role, isSnap });
   }
 
-  // Dealer: Book / Purchase Property under Gold Plan or Premium Plan
+  // Dealer / Buyer: Book / Purchase Property under Gold Plan or Platinum Plan
   @Post(':id/book')
   async bookProperty(@Param('id') id: string, @Body() body: any) {
     return this.propertiesService.bookProperty(id, body);
   }
 
-  // Dealer: Get my booked properties
+  // Dealer: Get my booked properties (Strictly Isolated)
   @Get('bookings/my')
   async findDealerBookings(
     @Query('email') email?: string,
     @Query('dealerId') dealerId?: string
   ) {
     return this.propertiesService.findDealerBookings(email, dealerId);
+  }
+
+  // Buyer: Get my booked properties / enquiries (Strictly Isolated)
+  @Get('bookings/buyer')
+  async findBuyerBookings(
+    @Query('email') email?: string,
+    @Query('buyerId') buyerId?: string
+  ) {
+    return this.propertiesService.findBuyerBookings(email, buyerId);
   }
 
   // Admin: Get all property bookings (Filterable by Buyer vs Dealer, Gold vs Premium Plan, and Status)
@@ -111,7 +121,6 @@ export class PropertiesController {
   // Create property (Seller, Dealer, or Admin quick-post)
   @Post()
   async create(@Body() body: any, @Request() req: any) {
-    // If bearer token attached, associate with user
     return this.propertiesService.create(body);
   }
 
@@ -127,19 +136,15 @@ export class PropertiesController {
     return this.propertiesService.updateStatus(id, body.status, tier);
   }
 
-  // Admin: Edit property details
-  @UseGuards(AdminGuard, PermissionsGuard)
-  @RequirePermissions('properties')
+  // Edit property details (Seller/Dealer can edit their own, Admin can edit any)
   @Patch(':id')
-  async update(@Param('id') id: string, @Body() body: any) {
-    return this.propertiesService.update(id, body);
+  async update(@Param('id') id: string, @Body() body: any, @Request() req: any) {
+    return this.propertiesService.update(id, body, req?.user);
   }
 
-  // Admin: Delete property
-  @UseGuards(AdminGuard, PermissionsGuard)
-  @RequirePermissions('properties')
+  // Delete property (Seller/Dealer can delete their own, Admin can delete any)
   @Delete(':id')
-  async delete(@Param('id') id: string) {
-    return this.propertiesService.delete(id);
+  async delete(@Param('id') id: string, @Request() req: any) {
+    return this.propertiesService.delete(id, req?.user);
   }
 }
