@@ -1,9 +1,12 @@
 import { Controller, Get, Patch, Delete, Param, Query, Body, UseGuards } from '@nestjs/common';
 import { CustomersService } from './customers.service';
 import { AdminGuard } from '../auth/jwt-auth.guard';
+import { PermissionsGuard } from '../common/permissions/permissions.guard';
+import { RequirePermissions } from '../common/permissions/permissions.decorator';
 
 @Controller('customers')
-@UseGuards(AdminGuard)
+@UseGuards(AdminGuard, PermissionsGuard)
+@RequirePermissions('buyers', 'sellers', 'dealers', 'common_people', 'customers')
 export class CustomersController {
   constructor(private customersService: CustomersService) {}
 

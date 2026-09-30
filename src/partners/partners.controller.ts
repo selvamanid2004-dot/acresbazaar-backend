@@ -1,6 +1,8 @@
 import { Controller, Get, Post, Patch, Delete, Param, Query, Body, UseGuards } from '@nestjs/common';
 import { PartnersService } from './partners.service';
 import { AdminGuard } from '../auth/jwt-auth.guard';
+import { PermissionsGuard } from '../common/permissions/permissions.guard';
+import { RequirePermissions } from '../common/permissions/permissions.decorator';
 
 @Controller('partners')
 export class PartnersController {
@@ -16,13 +18,15 @@ export class PartnersController {
     return this.partnersService.create(body);
   }
 
-  @UseGuards(AdminGuard)
+  @UseGuards(AdminGuard, PermissionsGuard)
+  @RequirePermissions('verified_partners')
   @Patch(':id/status')
   async updateStatus(@Param('id') id: string, @Body() body: { status: string }) {
     return this.partnersService.updateStatus(id, body.status);
   }
 
-  @UseGuards(AdminGuard)
+  @UseGuards(AdminGuard, PermissionsGuard)
+  @RequirePermissions('verified_partners')
   @Delete(':id')
   async delete(@Param('id') id: string) {
     return this.partnersService.delete(id);

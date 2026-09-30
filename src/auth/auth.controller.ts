@@ -23,7 +23,8 @@ export class AuthController {
   @UseGuards(AdminGuard)
   @Get('admin/me')
   async getAdminMe(@Request() req: any) {
-    return { success: true, admin: { id: req.user.sub, email: req.user.email, name: req.user.name, role: req.user.role } };
+    const admin = await this.authService.getAdminProfile(req.user.sub || req.user.id);
+    return { success: true, admin };
   }
 
   @Post('register')

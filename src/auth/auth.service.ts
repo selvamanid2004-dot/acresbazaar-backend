@@ -22,9 +22,22 @@ export class AuthService {
       throw new UnauthorizedException('Invalid admin credentials');
     }
 
+    if (admin.isActive === false) {
+      throw new UnauthorizedException('This administrator account has been deactivated. Please contact Super Admin.');
+    }
+
     const isMatch = await bcrypt.compare(password, admin.passwordHash);
     if (!isMatch) {
       throw new UnauthorizedException('Invalid admin credentials');
+    }
+
+    let parsedPermissions: string[] = [];
+    if (admin.permissions) {
+      try {
+        parsedPermissions = JSON.parse(admin.permissions);
+      } catch {
+        parsedPermissions = [];
+      }
     }
 
     const payload = {
@@ -32,6 +45,7 @@ export class AuthService {
       email: admin.email,
       name: admin.name,
       role: admin.role,
+      permissions: parsedPermissions,
       type: 'admin'
     };
 
@@ -43,8 +57,41 @@ export class AuthService {
         id: admin.id,
         email: admin.email,
         name: admin.name,
-        role: admin.role
+        role: admin.role,
+        permissions: parsedPermissions,
+        isActive: Boolean(admin.isActive)
       }
+    };
+  }
+
+  // 1b. Get Fresh Admin Profile
+  async getAdminProfile(adminId: string) {
+    const admin = await this.prisma.admin.findUnique({
+      where: { id: adminId }
+    });
+    if (!admin) {
+      throw new NotFoundException('Admin account not found');
+    }
+    if (!admin.isActive) {
+      throw new UnauthorizedException('Admin account is inactive');
+    }
+    let parsedPermissions: string[] = [];
+    if (admin.permissions) {
+      try {
+        parsedPermissions = JSON.parse(admin.permissions);
+      } catch {
+        parsedPermissions = [];
+      }
+    }
+    return {
+      id: admin.id,
+      email: admin.email,
+      name: admin.name,
+      role: admin.role,
+      permissions: parsedPermissions,
+      isActive: Boolean(admin.isActive),
+      createdAt: admin.createdAt,
+      updatedAt: admin.updatedAt
     };
   }
 

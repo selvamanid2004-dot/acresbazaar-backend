@@ -1,6 +1,8 @@
 import { Controller, Get, Post, Patch, Delete, Param, Query, Body, UseGuards, Request } from '@nestjs/common';
 import { PropertiesService } from './properties.service';
 import { AdminGuard, JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { PermissionsGuard } from '../common/permissions/permissions.guard';
+import { RequirePermissions } from '../common/permissions/permissions.decorator';
 
 @Controller('properties')
 export class PropertiesController {
@@ -34,7 +36,8 @@ export class PropertiesController {
   }
 
   // Admin endpoint: List all properties with status tabs (PENDING, APPROVED, HOLD, REJECTED, ALL)
-  @UseGuards(AdminGuard)
+  @UseGuards(AdminGuard, PermissionsGuard)
+  @RequirePermissions('properties', 'gold_properties', 'premium_properties', 'snap_properties')
   @Get('admin/all')
   async findAllAdmin(
     @Query('status') status?: string,
@@ -47,7 +50,8 @@ export class PropertiesController {
     return this.propertiesService.findAllAdmin({ status, category, search, role, isSnap, planType });
   }
 
-  @UseGuards(AdminGuard)
+  @UseGuards(AdminGuard, PermissionsGuard)
+  @RequirePermissions('properties', 'gold_properties', 'premium_properties', 'snap_properties')
   @Get()
   async findAll(
     @Query('status') status?: string,
@@ -75,7 +79,8 @@ export class PropertiesController {
   }
 
   // Admin: Get all property bookings (Filterable by Buyer vs Dealer, Gold vs Premium Plan, and Status)
-  @UseGuards(AdminGuard)
+  @UseGuards(AdminGuard, PermissionsGuard)
+  @RequirePermissions('bookings', 'properties', 'gold_properties', 'premium_properties')
   @Get('admin/bookings')
   async findAllBookingsAdmin(
     @Query('role') role?: string,
@@ -87,7 +92,8 @@ export class PropertiesController {
   }
 
   // Admin: Update Booking status
-  @UseGuards(AdminGuard)
+  @UseGuards(AdminGuard, PermissionsGuard)
+  @RequirePermissions('bookings', 'properties', 'gold_properties', 'premium_properties')
   @Patch('admin/bookings/:id/status')
   async updateBookingStatus(
     @Param('id') id: string,
@@ -110,7 +116,8 @@ export class PropertiesController {
   }
 
   // Admin: Update Status (APPROVE, REJECT, HOLD, PUBLISH) + optional tier/plan selection
-  @UseGuards(AdminGuard)
+  @UseGuards(AdminGuard, PermissionsGuard)
+  @RequirePermissions('properties')
   @Patch(':id/status')
   async updateStatus(
     @Param('id') id: string, 
@@ -121,14 +128,16 @@ export class PropertiesController {
   }
 
   // Admin: Edit property details
-  @UseGuards(AdminGuard)
+  @UseGuards(AdminGuard, PermissionsGuard)
+  @RequirePermissions('properties')
   @Patch(':id')
   async update(@Param('id') id: string, @Body() body: any) {
     return this.propertiesService.update(id, body);
   }
 
   // Admin: Delete property
-  @UseGuards(AdminGuard)
+  @UseGuards(AdminGuard, PermissionsGuard)
+  @RequirePermissions('properties')
   @Delete(':id')
   async delete(@Param('id') id: string) {
     return this.propertiesService.delete(id);

@@ -19,6 +19,7 @@ import { ChatsModule } from './chats/chats.module';
 import { CalendarModule } from './calendar/calendar.module';
 import { ExportModule } from './export/export.module';
 import { ActivitiesModule } from './activities/activities.module';
+import { StaffModule } from './staff/staff.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { ActivitiesModule } from './activities/activities.module';
     CalendarModule,
     ExportModule,
     ActivitiesModule,
+    StaffModule,
   ],
   providers: [
     {

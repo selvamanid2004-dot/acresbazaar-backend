@@ -1,6 +1,8 @@
 import { Controller, Get, Patch, Param, Body, UseGuards } from '@nestjs/common';
 import { PlansService } from './plans.service';
 import { AdminGuard } from '../auth/jwt-auth.guard';
+import { PermissionsGuard } from '../common/permissions/permissions.guard';
+import { RequirePermissions } from '../common/permissions/permissions.decorator';
 
 @Controller('plans')
 export class PlansController {
@@ -19,7 +21,8 @@ export class PlansController {
   }
 
   // Admin: Edit Gold or Platinum plan
-  @UseGuards(AdminGuard)
+  @UseGuards(AdminGuard, PermissionsGuard)
+  @RequirePermissions('plans')
   @Patch(':planId')
   async update(@Param('planId') planId: string, @Body() body: any) {
     return this.plansService.update(planId.toLowerCase(), body);
