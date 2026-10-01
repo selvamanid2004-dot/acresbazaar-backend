@@ -28,10 +28,16 @@ function saveBase64Image(dataUrl: string, category?: string): string {
     return getCategoryFallbackImage(category);
   }
   const trimmed = dataUrl.trim();
+  if (trimmed.length < 500 && trimmed.startsWith('data:image/')) {
+    return getCategoryFallbackImage(category);
+  }
+  if (trimmed.includes('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==')) {
+    return getCategoryFallbackImage(category);
+  }
   if (trimmed.startsWith('data:image/')) {
     try {
       const matches = trimmed.match(/^data:image\/([a-zA-Z0-9+.-]+);base64,(.+)$/);
-      if (matches) {
+      if (matches && matches[2].length > 300) {
         const rawExt = matches[1].toLowerCase();
         const ext = rawExt.includes('png') ? 'png' : rawExt.includes('webp') ? 'webp' : 'jpg';
         const buffer = Buffer.from(matches[2], 'base64');
@@ -51,7 +57,10 @@ function saveBase64Image(dataUrl: string, category?: string): string {
       return trimmed;
     }
   }
-  return trimmed || getCategoryFallbackImage(category);
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('/uploads/')) {
+    return trimmed;
+  }
+  return getCategoryFallbackImage(category);
 }
 
 function parseBudgetRange(budget?: string): { min?: number; max?: number } {
@@ -174,7 +183,24 @@ export class PropertiesService {
       }
     });
 
-    return { success: true, count: properties.length, properties };
+    const sanitizedProperties = properties.map(p => {
+      let imgs = (p.images || []).map(img => ({
+        ...img,
+        imageUrl: saveBase64Image(img.imageUrl, p.category)
+      }));
+      if (imgs.length === 0) {
+        imgs = [{
+          id: `fallback-${p.id}`,
+          propertyId: p.id,
+          imageUrl: getCategoryFallbackImage(p.category),
+          isPrimary: true,
+          displayOrder: 0
+        } as any];
+      }
+      return { ...p, images: imgs };
+    });
+
+    return { success: true, count: sanitizedProperties.length, properties: sanitizedProperties };
   }
 
   // 2. Find Single Property
@@ -190,7 +216,20 @@ export class PropertiesService {
     if (!property) {
       throw new NotFoundException('Property not found');
     }
-    return { success: true, property };
+    let imgs = (property.images || []).map(img => ({
+      ...img,
+      imageUrl: saveBase64Image(img.imageUrl, property.category)
+    }));
+    if (imgs.length === 0) {
+      imgs = [{
+        id: `fallback-${property.id}`,
+        propertyId: property.id,
+        imageUrl: getCategoryFallbackImage(property.category),
+        isPrimary: true,
+        displayOrder: 0
+      } as any];
+    }
+    return { success: true, property: { ...property, images: imgs } };
   }
 
   // 3. Create Property (Seller, Dealer, Partner, or Admin quick-post)
@@ -335,7 +374,8 @@ export class PropertiesService {
     if (Array.isArray(data.images)) {
       imageList = data.images
         .map((img: any) => (typeof img === 'string' ? img : (img?.imageUrl || img?.url || '')))
-        .filter((url: string) => typeof url === 'string' && url.trim().length > 0);
+        .filter((url: string) => typeof url === 'string' && url.trim().length > 0)
+        .map((url: string) => saveBase64Image(url, category));
     }
     if (imageList.length === 0) {
       imageList.push(getCategoryFallbackImage(category));
@@ -799,19 +839,24 @@ export class PropertiesService {
     return {
       success: true,
       statistics: stats,
-      properties: properties.map(p => ({
-        property_id: p.id,
-        title: p.title,
-        category: p.category,
-        plan: p.planType,
-        price: p.priceDisplay || `₹${p.price.toLocaleString('en-IN')}`,
-        location: p.location,
-        city: p.city,
-        status: p.status,
-        created_at: p.createdAt.toISOString(),
-        image_urls: p.images.map(img => img.imageUrl),
-        category_specs: (() => { try { return p.categorySpecs ? JSON.parse(p.categorySpecs) : {}; } catch { return {}; } })()
-      }))
+      properties: properties.map(p => {
+        const urls = p.images.map(img => saveBase64Image(img.imageUrl, p.category));
+        if (urls.length === 0) urls.push(getCategoryFallbackImage(p.category));
+        return {
+          property_id: p.id,
+          title: p.title,
+          category: p.category,
+          plan: p.planType,
+          price: p.priceDisplay || `₹${p.price.toLocaleString('en-IN')}`,
+          location: p.location,
+          city: p.city,
+          status: p.status,
+          created_at: p.createdAt.toISOString(),
+          image_urls: urls,
+          imageUrl: urls[0],
+          category_specs: (() => { try { return p.categorySpecs ? JSON.parse(p.categorySpecs) : {}; } catch { return {}; } })()
+        };
+      })
     };
   }
 
@@ -867,6 +912,9 @@ export class PropertiesService {
           specs = p.categorySpecs ? JSON.parse(p.categorySpecs) : {};
         } catch {}
 
+        const urls = p.images.map(img => saveBase64Image(img.imageUrl, p.category));
+        if (urls.length === 0) urls.push(getCategoryFallbackImage(p.category));
+
         return {
           property_id: p.id,
           id: p.id,
@@ -882,7 +930,8 @@ export class PropertiesService {
           full_address: p.location,
           status: p.status,
           created_at: p.createdAt.toISOString(),
-          image_urls: p.images.map(img => img.imageUrl),
+          image_urls: urls,
+          imageUrl: urls[0],
           category_specs: specs,
           seller_id: p.sellerId,
           seller_name: p.sellerName,
