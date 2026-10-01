@@ -30,6 +30,61 @@ function saveBase64Image(dataUrl: string): string {
   return trimmed;
 }
 
+function parseBudgetRange(budget?: string): { min?: number; max?: number } {
+  if (!budget || budget === 'any' || budget === 'ALL') return {};
+  const b = budget.toLowerCase().trim();
+
+  if (b.includes('under-20') || b.includes('0-20') || b === 'under-20l' || b === 'under-20-lakhs') {
+    return { min: 0, max: 2000000 };
+  }
+  if (b.includes('20l-50l') || b.includes('20-50') || b.includes('20lakhs-50lakhs') || b === '20l-50l') {
+    return { min: 2000000, max: 5000000 };
+  }
+  if (b.includes('50l-1cr') || b.includes('50-1cr') || b.includes('50lakhs-1crore') || b === '50l-1cr') {
+    return { min: 5000000, max: 10000000 };
+  }
+  if (b.includes('1cr-3cr') || b.includes('1-3cr') || b.includes('1crore-3crore') || b === '1cr-3cr') {
+    return { min: 10000000, max: 30000000 };
+  }
+  if (b.includes('3cr-5cr') || b.includes('3-5cr') || b.includes('3crore-5crore') || b === '3cr-5cr') {
+    return { min: 30000000, max: 50000000 };
+  }
+  if (b.includes('above-5cr') || b.includes('5cr-plus') || b.includes('5cr+') || b.includes('above-5crore') || b === 'above-5cr') {
+    return { min: 50000000 };
+  }
+  if (b.includes('under-500k')) return { min: 0, max: 500000 };
+  if (b.includes('500k-1m')) return { min: 500000, max: 1000000 };
+  if (b.includes('1m-2m')) return { min: 1000000, max: 2000000 };
+  if (b.includes('2m-5m')) return { min: 2000000, max: 5000000 };
+  if (b.includes('5m-plus')) return { min: 5000000 };
+
+  if (b.includes('-')) {
+    const parts = b.split('-');
+    const minVal = parseFloat(parts[0]);
+    const maxVal = parseFloat(parts[1]);
+    return {
+      min: !isNaN(minVal) ? minVal : undefined,
+      max: !isNaN(maxVal) ? maxVal : undefined
+    };
+  }
+
+  return {};
+}
+
+function normalizeCategoryTerms(catSlugOrName: string): string[] {
+  const c = catSlugOrName.toLowerCase().trim();
+  if (!c || c === 'all' || c === 'all-residential') return [];
+
+  if (c.includes('plot') || c.includes('land')) return ['Plot', 'Plots', 'Land', 'Plots & Land', 'Plots & Lands', 'plots', 'plots-land'];
+  if (c.includes('villa') || c.includes('estate')) return ['Villa', 'Villas', 'Villas & Estates', 'villas', 'villas-estates'];
+  if (c.includes('apartment') || c.includes('flat')) return ['Apartment', 'Apartments', 'Apartment / Flats', 'Flats', 'apartments'];
+  if (c.includes('house') || c.includes('independent')) return ['Independent House', 'Independent Houses', 'House', 'Houses', 'independent-houses'];
+  if (c.includes('commercial') || c.includes('office') || c.includes('retail')) return ['Commercial', 'Commercial Space', 'Commercial Spaces', 'commercial', 'commercial-spaces'];
+  if (c.includes('farm')) return ['Farm Land', 'Farm Lands', 'Farm', 'farm-lands'];
+
+  return [catSlugOrName];
+}
+
 @Injectable()
 export class PropertiesService {
   constructor(private prisma: PrismaService) {}
@@ -75,12 +130,11 @@ export class PropertiesService {
 
     if (search && search.trim()) {
       const q = search.trim();
-      // FIX: case-insensitive search via mode: 'insensitive'
       const searchConditions = [
-        { title:      { contains: q, mode: 'insensitive' } },
-        { location:   { contains: q, mode: 'insensitive' } },
-        { city:       { contains: q, mode: 'insensitive' } },
-        { sellerName: { contains: q, mode: 'insensitive' } }
+        { title:      { contains: q } },
+        { location:   { contains: q } },
+        { city:       { contains: q } },
+        { sellerName: { contains: q } }
       ];
       where.AND = [ ...(where.AND || []), { OR: searchConditions } ];
     }
@@ -416,35 +470,192 @@ export class PropertiesService {
     return { success: true, message: 'Property deleted successfully' };
   }
 
-  // 7. PUBLIC Endpoint for Website (Returns only APPROVED properties)
-  async findPublic(query: { category?: string; planType?: string; search?: string }) {
-    const { category, planType, search } = query;
+  // 7. PUBLIC Endpoint for Website (Returns only APPROVED properties with Multi-criteria Filter Search)
+  async findPublic(query: { 
+    category?: string; 
+    location?: string; 
+    budget?: string; 
+    minPrice?: string | number; 
+    maxPrice?: string | number; 
+    propertyType?: string;
+    bhk?: string;
+    facing?: string;
+    furnishing?: string;
+    constructionStatus?: string;
+    planType?: string; 
+    search?: string; 
+    isSnap?: string;
+  }) {
+    const { category, location, budget, minPrice, maxPrice, propertyType, bhk, facing, furnishing, constructionStatus, planType, search, isSnap } = query;
     const where: any = {
       status: 'APPROVED' // Only approved properties published on Public Website
     };
 
-    if (category && category !== 'ALL') {
-      where.category = category;
+    const andConditions: any[] = [];
+
+    // 1. Dynamic location search (matches any city, locality, district, or area in database)
+    const locQuery = (location || '').trim();
+    if (locQuery && locQuery.toUpperCase() !== 'ALL') {
+      const parts = locQuery.split(/[\s,]+/).map(p => p.trim()).filter(p => p.length > 1);
+      if (parts.length > 1) {
+        // Multi-word search (e.g. "Anna Nagar Chennai", "Fairlands Salem"): each word matches property location fields
+        const wordConditions = parts.map(word => ({
+          OR: [
+            { location: { contains: word } },
+            { city: { contains: word } },
+            { title: { contains: word } },
+            { description: { contains: word } }
+          ]
+        }));
+        andConditions.push({ AND: wordConditions });
+      } else {
+        andConditions.push({
+          OR: [
+            { location: { contains: locQuery } },
+            { city: { contains: locQuery } },
+            { title: { contains: locQuery } },
+            { description: { contains: locQuery } }
+          ]
+        });
+      }
     }
 
+    // 2. Category search
+    const catQuery = (category || '').trim();
+    if (catQuery && catQuery.toUpperCase() !== 'ALL' && catQuery.toLowerCase() !== 'all-residential') {
+      const catTerms = normalizeCategoryTerms(catQuery);
+      if (catTerms.length > 0) {
+        andConditions.push({
+          OR: catTerms.map(term => ({ category: { contains: term } }))
+        });
+      }
+    }
+
+    // 3. Property Type / Sub-Type Filter
+    if (propertyType && propertyType !== 'ALL' && propertyType !== 'any') {
+      const pt = propertyType.trim();
+      andConditions.push({
+        OR: [
+          { categorySpecs: { contains: pt } },
+          { category: { contains: pt } },
+          { description: { contains: pt } },
+          { title: { contains: pt } }
+        ]
+      });
+    }
+
+    // 4. BHK / Bedrooms Filter
+    if (bhk && bhk !== 'ALL' && bhk !== 'any') {
+      const cleanBhk = bhk.replace(/[^0-9]/g, '');
+      const bhkOr: any[] = [
+        { categorySpecs: { contains: bhk } },
+        { title: { contains: bhk } },
+        { description: { contains: bhk } }
+      ];
+      if (cleanBhk) {
+        bhkOr.push({ categorySpecs: { contains: `${cleanBhk} BHK` } });
+        bhkOr.push({ categorySpecs: { contains: `"beds":${cleanBhk}` } });
+        bhkOr.push({ categorySpecs: { contains: `"beds":"${cleanBhk}"` } });
+        bhkOr.push({ title: { contains: `${cleanBhk} BHK` } });
+      }
+      andConditions.push({ OR: bhkOr });
+    }
+
+    // 5. Facing Direction Filter
+    if (facing && facing !== 'ALL' && facing !== 'any') {
+      const fc = facing.trim();
+      andConditions.push({
+        OR: [
+          { categorySpecs: { contains: fc } },
+          { description: { contains: fc } },
+          { title: { contains: fc } }
+        ]
+      });
+    }
+
+    // 6. Furnishing Status Filter
+    if (furnishing && furnishing !== 'ALL' && furnishing !== 'any') {
+      const fn = furnishing.trim();
+      andConditions.push({
+        OR: [
+          { categorySpecs: { contains: fn } },
+          { description: { contains: fn } }
+        ]
+      });
+    }
+
+    // 7. Possession / Construction Status Filter
+    if (constructionStatus && constructionStatus !== 'ALL' && constructionStatus !== 'any') {
+      const cs = constructionStatus.trim();
+      andConditions.push({
+        OR: [
+          { categorySpecs: { contains: cs } },
+          { description: { contains: cs } },
+          { title: { contains: cs } }
+        ]
+      });
+    }
+
+    // 8. Budget / Price Range Search
+    let minP = minPrice !== undefined && minPrice !== '' ? parseFloat(String(minPrice)) : undefined;
+    let maxP = maxPrice !== undefined && maxPrice !== '' ? parseFloat(String(maxPrice)) : undefined;
+
+    if (budget && budget !== 'any' && budget !== 'ALL') {
+      const parsed = parseBudgetRange(budget);
+      if (parsed.min !== undefined && minP === undefined) minP = parsed.min;
+      if (parsed.max !== undefined && maxP === undefined) maxP = parsed.max;
+    }
+
+    if (minP !== undefined || maxP !== undefined) {
+      const priceCond: any = {};
+      if (minP !== undefined && !isNaN(minP)) priceCond.gte = minP;
+      if (maxP !== undefined && !isNaN(maxP)) priceCond.lte = maxP;
+      andConditions.push({ price: priceCond });
+    }
+
+    // 9. Plan Type Filter (Gold / Platinum)
     if (planType && planType !== 'ALL') {
-      where.planType = planType.toUpperCase();
+      const cleanPlan = planType.toUpperCase().trim();
+      andConditions.push({
+        planType: cleanPlan.includes('GOLD') ? 'GOLD' : 'PLATINUM'
+      });
     }
 
+    // 10. Snap Property Source Rule
+    if (isSnap === 'true') {
+      andConditions.push({
+        OR: [
+          { seller: { role: { in: ['COMMON_PEOPLE', 'PARTNER'] } } },
+          { sellerRole: { in: ['COMMON_PEOPLE', 'PARTNER'] } }
+        ]
+      });
+    }
+
+    // 11. Free text search
     if (search && search.trim()) {
       const q = search.trim();
-      where.OR = [
-        { title: { contains: q } },
-        { location: { contains: q } },
-        { city: { contains: q } }
-      ];
+      andConditions.push({
+        OR: [
+          { title: { contains: q } },
+          { location: { contains: q } },
+          { city: { contains: q } },
+          { description: { contains: q } }
+        ]
+      });
+    }
+
+    if (andConditions.length > 0) {
+      where.AND = andConditions;
     }
 
     const properties = await this.prisma.property.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       include: {
-        images: { orderBy: { displayOrder: 'asc' } }
+        images: { orderBy: { displayOrder: 'asc' } },
+        seller: {
+          select: { id: true, name: true, email: true, mobile: true, role: true }
+        }
       }
     });
 
@@ -479,12 +690,61 @@ export class PropertiesService {
           imageUrl: mainImage,
           galleryImages: galleryImages,
           specs,
-          sellerName: p.sellerName || 'Verified Partner',
-          sellerPhone: p.sellerPhone,
+          sellerName: p.sellerName || p.seller?.name || 'Verified Partner',
+          sellerPhone: p.sellerPhone || p.seller?.mobile,
           status: p.status,
           createdAt: p.createdAt
         };
       })
+    };
+  }
+
+  // Dynamic location list derived purely from live database property data
+  async getDistinctLocations(query?: string) {
+    const q = (query || '').trim().toLowerCase();
+
+    // Fetch approved properties from database
+    const properties = await this.prisma.property.findMany({
+      where: {
+        status: 'APPROVED'
+      },
+      select: {
+        location: true,
+        city: true
+      },
+      take: 500
+    });
+
+    const locationSet = new Set<string>();
+
+    for (const p of properties) {
+      if (p.city && p.city.trim() && p.city.toLowerCase() !== 'unknown') {
+        locationSet.add(p.city.trim());
+      }
+      if (p.location && p.location.trim() && p.location.toLowerCase() !== 'unknown') {
+        const fullLoc = p.location.trim();
+        locationSet.add(fullLoc);
+
+        // Also split by commas if location has multiple parts like "Fairlands, Salem" or "Anna Nagar, Chennai"
+        const segments = fullLoc.split(',').map(s => s.trim()).filter(s => s.length > 1 && s.toLowerCase() !== 'unknown' && s.toLowerCase() !== 'india');
+        for (const seg of segments) {
+          locationSet.add(seg);
+        }
+      }
+    }
+
+    let list = Array.from(locationSet);
+    if (q) {
+      list = list.filter(item => item.toLowerCase().includes(q));
+    }
+
+    // Sort alphabetically
+    list.sort((a, b) => a.localeCompare(b));
+
+    return {
+      success: true,
+      count: list.length,
+      locations: list.slice(0, 50)
     };
   }
 

@@ -8,14 +8,45 @@ import { RequirePermissions } from '../common/permissions/permissions.decorator'
 export class PropertiesController {
   constructor(private propertiesService: PropertiesService) {}
 
-  // Public endpoint for Public Website (Approved properties only)
+  // Public endpoint for Public Website (Approved properties only with Multi-criteria Filter Search)
   @Get('public')
   async findPublic(
     @Query('category') category?: string,
+    @Query('location') location?: string,
+    @Query('city') city?: string,
+    @Query('budget') budget?: string,
+    @Query('minPrice') minPrice?: string,
+    @Query('maxPrice') maxPrice?: string,
+    @Query('propertyType') propertyType?: string,
+    @Query('bhk') bhk?: string,
+    @Query('facing') facing?: string,
+    @Query('furnishing') furnishing?: string,
+    @Query('constructionStatus') constructionStatus?: string,
     @Query('planType') planType?: string,
-    @Query('search') search?: string
+    @Query('search') search?: string,
+    @Query('isSnap') isSnap?: string
   ) {
-    return this.propertiesService.findPublic({ category, planType, search });
+    return this.propertiesService.findPublic({ 
+      category, 
+      location: location || city, 
+      budget, 
+      minPrice, 
+      maxPrice, 
+      propertyType,
+      bhk,
+      facing,
+      furnishing,
+      constructionStatus,
+      planType, 
+      search, 
+      isSnap 
+    });
+  }
+
+  // Public endpoint for dynamic location/city autocomplete suggestions from live database properties
+  @Get('locations')
+  async getLocations(@Query('q') q?: string) {
+    return this.propertiesService.getDistinctLocations(q);
   }
 
   // Seller / Dealer: Get my submitted properties
