@@ -31,6 +31,22 @@ async function bootstrap() {
     prefix: '/uploads/',
   });
 
+  // Fallback for missing /uploads/* images (prevents broken 404 images on ephemeral instances)
+  app.use('/uploads', (req: any, res: any, next: any) => {
+    const reqPath = (req.path || '').toLowerCase();
+    if (reqPath.includes('logo')) {
+      const defaultLogo = join(uploadsDir, 'logo-1790858548202.jpg');
+      if (fs.existsSync(defaultLogo)) {
+        return res.sendFile(defaultLogo);
+      }
+      const altLogo = join(uploadsDir, 'logo-1790321825874.jpg');
+      if (fs.existsSync(altLogo)) {
+        return res.sendFile(altLogo);
+      }
+    }
+    return res.redirect('https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80');
+  });
+
   // Enable CORS for frontend clients
   app.enableCors({
     origin: true,

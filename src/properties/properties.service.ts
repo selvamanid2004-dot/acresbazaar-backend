@@ -3,9 +3,29 @@ import { PrismaService } from '../prisma/prisma.service';
 import * as fs from 'fs';
 import * as path from 'path';
 
-function saveBase64Image(dataUrl: string): string {
+function getCategoryFallbackImage(category?: string): string {
+  const cat = (category || '').toLowerCase();
+  if (cat.includes('plot') || cat.includes('land')) {
+    return 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=800&q=80';
+  }
+  if (cat.includes('villa') || cat.includes('estate') || cat.includes('house')) {
+    return 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=800&q=80';
+  }
+  if (cat.includes('apartment') || cat.includes('flat')) {
+    return 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80';
+  }
+  if (cat.includes('commercial') || cat.includes('office') || cat.includes('retail')) {
+    return 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=800&q=80';
+  }
+  if (cat.includes('farm')) {
+    return 'https://images.unsplash.com/photo-1500076656116-558758c991c1?auto=format&fit=crop&w=800&q=80';
+  }
+  return 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80';
+}
+
+function saveBase64Image(dataUrl: string, category?: string): string {
   if (!dataUrl || typeof dataUrl !== 'string') {
-    return 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80';
+    return getCategoryFallbackImage(category);
   }
   const trimmed = dataUrl.trim();
   if (trimmed.startsWith('data:image/')) {
@@ -19,15 +39,19 @@ function saveBase64Image(dataUrl: string): string {
         if (!fs.existsSync(uploadsDir)) {
           fs.mkdirSync(uploadsDir, { recursive: true });
         }
-        const fileName = `prop-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-        fs.writeFileSync(path.join(uploadsDir, fileName), buffer);
+        const hash = require('crypto').createHash('md5').update(matches[2].slice(0, 1000)).digest('hex').slice(0, 12);
+        const fileName = `prop-${hash}.${ext}`;
+        const filePath = path.join(uploadsDir, fileName);
+        if (!fs.existsSync(filePath)) {
+          fs.writeFileSync(filePath, buffer);
+        }
         return `/uploads/${fileName}`;
       }
     } catch {
-      return 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80';
+      return trimmed;
     }
   }
-  return trimmed;
+  return trimmed || getCategoryFallbackImage(category);
 }
 
 function parseBudgetRange(budget?: string): { min?: number; max?: number } {
@@ -314,7 +338,7 @@ export class PropertiesService {
         .filter((url: string) => typeof url === 'string' && url.trim().length > 0);
     }
     if (imageList.length === 0) {
-      imageList.push('https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80');
+      imageList.push(getCategoryFallbackImage(category));
     }
 
     // Determine city (already declared above; derive from location if not provided)
@@ -671,9 +695,9 @@ export class PropertiesService {
         const planNormalized = (p.planType || 'PLATINUM').toUpperCase();
         const tier = planNormalized === 'GOLD' ? 'gold' : 'platinum';
 
-        const rawMain = p.images[0]?.imageUrl;
-        const mainImage = rawMain ? saveBase64Image(rawMain) : 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80';
-        const galleryImages = (p.images || []).map(img => saveBase64Image(img.imageUrl));
+        const rawMain = p.images && p.images[0] ? p.images[0].imageUrl : null;
+        const mainImage = rawMain ? saveBase64Image(rawMain, p.category) : getCategoryFallbackImage(p.category);
+        const galleryImages = (p.images || []).map(img => img.imageUrl ? saveBase64Image(img.imageUrl, p.category) : getCategoryFallbackImage(p.category));
 
         return {
           id: p.id,
