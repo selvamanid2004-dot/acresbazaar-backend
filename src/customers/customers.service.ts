@@ -69,35 +69,6 @@ export class CustomersService {
       }
     });
 
-    // 3. If querying ALL customers (and not filtering by isNew or specific role), include Admins
-    if ((!cleanRole || cleanRole === 'ALL') && isNew !== 'true') {
-      const adminWhere: any = {};
-      if (search && search.trim()) {
-        const q = search.trim();
-        adminWhere.OR = [
-          { name: { contains: q } },
-          { email: { contains: q } }
-        ];
-      }
-      const admins = await this.prisma.admin.findMany({
-        where: adminWhere,
-        orderBy: { createdAt: 'desc' }
-      });
-      const formattedAdmins = admins.map(a => ({
-        id: a.id,
-        name: a.name || 'Executive Administrator',
-        email: a.email,
-        mobile: 'Authorized System Contact',
-        role: a.role || 'SUPER_ADMIN',
-        isActive: true,
-        createdAt: a.createdAt,
-        updatedAt: a.updatedAt,
-        _count: { properties: 0 }
-      }));
-      const combined = [...formattedAdmins, ...customers];
-      return { success: true, count: combined.length, customers: combined };
-    }
-
     return { success: true, count: customers.length, customers };
   }
 

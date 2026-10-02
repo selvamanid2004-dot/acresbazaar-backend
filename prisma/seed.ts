@@ -57,13 +57,16 @@ async function main() {
 
   // 3. Seed Users
   console.log(`▶ [3/6] Seeding ${data.users?.length || 0} Users / Customers...`);
+  const userMap = new Map<string, string>();
   for (const user of data.users || []) {
     const { id, createdAt, updatedAt, ...rest } = user;
-    await prisma.user.upsert({
+    const dbUser = await prisma.user.upsert({
       where: { email: user.email },
       update: { ...rest },
       create: { id, ...rest }
     });
+    userMap.set(user.id, dbUser.id);
+    userMap.set(user.email, dbUser.id);
   }
 
   // 4. Seed Categories & Plans
@@ -87,21 +90,43 @@ async function main() {
 
   // 5. Seed Properties & Images
   console.log(`▶ [5/6] Seeding exactly ${data.properties?.length || 0} Properties...`);
+  const defaultUserId = userMap.get('seller@acresbazaar.com') || (userMap.size > 0 ? Array.from(userMap.values())[0] : undefined);
   for (const prop of data.properties || []) {
-    const { id, createdAt, updatedAt, ...rest } = prop;
+    const { id, createdAt, updatedAt, sellerId, userId, ...rest } = prop;
+    let resolvedUserId = sellerId || userId;
+    if (resolvedUserId && userMap.has(resolvedUserId)) {
+      resolvedUserId = userMap.get(resolvedUserId);
+    } else if (defaultUserId) {
+      resolvedUserId = defaultUserId;
+    }
+
     await prisma.property.upsert({
       where: { id },
-      update: { ...rest },
-      create: { id, ...rest }
+      update: {
+        ...rest,
+        seller: resolvedUserId ? { connect: { id: resolvedUserId } } : undefined
+      },
+      create: {
+        id,
+        ...rest,
+        seller: resolvedUserId ? { connect: { id: resolvedUserId } } : undefined
+      }
     });
   }
 
   for (const img of data.propertyImages || []) {
-    const { id, createdAt, ...rest } = img;
+    const { id, createdAt, propertyId, ...rest } = img;
     await prisma.propertyImage.upsert({
       where: { id },
-      update: { ...rest },
-      create: { id, ...rest }
+      update: {
+        ...rest,
+        property: { connect: { id: propertyId } }
+      },
+      create: {
+        id,
+        ...rest,
+        property: { connect: { id: propertyId } }
+      }
     });
   }
 
@@ -116,11 +141,18 @@ async function main() {
   }
 
   for (const booking of data.bookings || []) {
-    const { id, createdAt, updatedAt, ...rest } = booking;
+    const { id, createdAt, updatedAt, propertyId, ...rest } = booking;
     await prisma.propertyBooking.upsert({
       where: { id },
-      update: { ...rest },
-      create: { id, ...rest }
+      update: {
+        ...rest,
+        property: propertyId ? { connect: { id: propertyId } } : undefined
+      },
+      create: {
+        id,
+        ...rest,
+        property: propertyId ? { connect: { id: propertyId } } : undefined
+      }
     });
   }
 
