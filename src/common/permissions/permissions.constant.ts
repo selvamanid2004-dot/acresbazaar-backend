@@ -28,9 +28,9 @@ export const ADMIN_MODULE_PERMISSIONS = [
   },
   {
     id: 'common_people',
-    name: 'Common People / Spotters',
+    name: 'Community Partners',
     group: 'Customer Management',
-    description: 'View and manage spotters and common users submitting property snaps'
+    description: 'View and manage community partners submitting property snaps'
   },
 
   // 3. Properties
@@ -56,7 +56,7 @@ export const ADMIN_MODULE_PERMISSIONS = [
     id: 'snap_properties',
     name: 'Snap Properties',
     group: 'Property Operations',
-    description: 'Review and approve properties snapped by spotters/common people'
+    description: 'Review and approve properties snapped by community partners'
   },
   {
     id: 'bookings',
@@ -102,7 +102,7 @@ export const ADMIN_MODULE_PERMISSIONS = [
     id: 'rewards',
     name: 'Rewards',
     group: 'Operations & Moderation',
-    description: 'Manage spotter rewards, bounties, and dealer points payout'
+    description: 'Manage partner rewards, bounties, and dealer points payout'
   },
   {
     id: 'verified_partners',
