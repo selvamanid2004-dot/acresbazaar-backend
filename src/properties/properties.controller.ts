@@ -161,10 +161,11 @@ export class PropertiesController {
   @Patch(':id/status')
   async updateStatus(
     @Param('id') id: string, 
-    @Body() body: { status: string; planType?: string; tier?: string }
+    @Body() body: { status: string; planType?: string; tier?: string },
+    @Request() req: any
   ) {
     const tier = body.planType || body.tier;
-    return this.propertiesService.updateStatus(id, body.status, tier);
+    return this.propertiesService.updateStatus(id, body.status, tier, req?.user);
   }
 
   // Edit property details (Seller/Dealer can edit their own, Admin can edit any)

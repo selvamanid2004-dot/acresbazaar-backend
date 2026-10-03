@@ -69,6 +69,7 @@ model Property {
   sellerRole    String?         @default("SELLER") // "SELLER", "DEALER", "COMMON_PEOPLE"
   dealerCompany String?
   categorySpecs String?         // JSON serialized specs
+  pointsAwarded Boolean         @default(false)
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
   images        PropertyImage[]
@@ -227,3 +228,105 @@ model UserActivity {
   @@index([userId, actionType])
   @@index([actionType, createdAt])
 }
+
+model PartnerWallet {
+  id                  String             @id @default(uuid())
+  partnerEmail        String             @unique
+  partnerName         String?
+  partnerPhone        String?
+  partnerRole         String             @default("PARTNER")
+  availablePoints     Int                @default(0)
+  reservedPoints      Int                @default(0)
+  totalEarnedPoints   Int                @default(0)
+  totalRedeemedPoints Int                @default(0)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  transactions        PointsLedger[]
+  claims              RewardClaim[]
+  bankDetail          PartnerBankDetail?
+
+  @@index([partnerEmail])
+}
+
+model PointsLedger {
+  id              String         @id @default(uuid())
+  partnerEmail    String
+  partnerName     String?
+  partnerRole     String?
+  propertyId      String?
+  propertyTitle   String?
+  claimId         String?
+  transactionType String         // "PROPERTY_APPROVED", "REWARD_RESERVED", "REWARD_PAID", "REWARD_CLAIM_REJECTED", "REWARD_POINTS_RELEASED", "ADMIN_ADJUSTMENT"
+  points          Int            // e.g. +20, -500, +500
+  balanceBefore   Int
+  balanceAfter    Int
+  description     String
+  adminId         String?
+  adminName       String?
+  createdAt       DateTime       @default(now())
+  wallet          PartnerWallet? @relation(fields: [partnerEmail], references: [partnerEmail], onDelete: Cascade)
+
+  @@index([partnerEmail])
+  @@index([propertyId])
+  @@index([transactionType])
+  @@index([createdAt])
+}
+
+model PartnerBankDetail {
+  id                String        @id @default(uuid())
+  partnerEmail      String        @unique
+  partnerName       String
+  accountHolderName String
+  accountNumber     String
+  ifscCode          String
+  bankName          String
+  upiId             String?
+  mobileNumber      String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  wallet            PartnerWallet @relation(fields: [partnerEmail], references: [partnerEmail], onDelete: Cascade)
+
+  @@index([partnerEmail])
+}
+
+model RewardClaim {
+  id                   String         @id @default(uuid())
+  claimNumber          String         @unique // e.g. "CLM-1001"
+  partnerEmail         String
+  partnerName          String
+  partnerPhone         String?
+  partnerRole          String?        @default("PARTNER")
+  redeemedPoints       Int
+  rewardAmount         Float
+  conversionRate       String?        // e.g. "500 Points = ₹500"
+  bankAccountHolder    String
+  bankAccountNumber    String
+  ifscCode             String
+  bankName             String
+  upiId                String?
+  mobileNumber         String?
+  status               String         @default("PENDING") // "PENDING", "APPROVED", "PROCESSING", "PAID", "REJECTED"
+  adminNotes           String?
+  rejectionReason      String?
+  paymentReference     String?        // Transaction reference / UTR ID
+  paymentDate          DateTime?
+  processedByAdminId   String?
+  processedByAdminName String?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  wallet               PartnerWallet? @relation(fields: [partnerEmail], references: [partnerEmail], onDelete: Cascade)
+
+  @@index([partnerEmail])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model RewardSetting {
+  id                String   @id @default(uuid())
+  pointsPerReward   Int      @default(500)
+  rewardAmountInInr Float    @default(500)
+  pointsPerProperty Int      @default(20)
+  updatedBy         String?
+  updatedAt         DateTime @updatedAt
+}
+

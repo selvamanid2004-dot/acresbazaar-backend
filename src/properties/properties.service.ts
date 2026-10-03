@@ -416,27 +416,6 @@ export class PropertiesService {
       }
     });
 
-    // Award +250 points to dealer when listing a property for sale
-    if (isDealerListing) {
-      try {
-        await this.prisma.reward.create({
-          data: {
-            userName: sellerName || 'Dealer Partner',
-            userEmail: sellerEmail || null,
-            userRole: 'DEALER',
-            propertyTitle: property.title,
-            rewardTitle: 'Dealer Property Listing Reward',
-            points: 250,
-            amount: 250,
-            reason: `Listed property "${property.title}" for sale. Agency: ${dealerCompany || 'Authorized Dealer'}`,
-            status: 'APPROVED'
-          }
-        });
-      } catch (err) {
-        console.error('Failed to award dealer listing points:', err);
-      }
-    }
-
     return {
       success: true,
       message: 'Property created successfully' + (status === 'PENDING' ? ' and submitted for admin review.' : '.'),
@@ -444,8 +423,102 @@ export class PropertiesService {
     };
   }
 
+  // Helper method: Award 20 Points on property approval (Strictly Idempotent)
+  private async awardApprovalPointsIdempotent(propertyId: string, adminUser?: any) {
+    try {
+      const property = await this.prisma.property.findUnique({ where: { id: propertyId } });
+      if (!property || property.pointsAwarded) {
+        return; // Already awarded or not found
+      }
+
+      const setting = await this.prisma.rewardSetting.findFirst();
+      const pointsToAward = setting?.pointsPerProperty || 20;
+
+      const partnerEmail = (property.sellerEmail || '').trim().toLowerCase() || 'partner@acresbazaar.com';
+      const partnerName = property.sellerName || 'Partner';
+      const partnerRole = property.sellerRole || 'PARTNER';
+
+      await this.prisma.$transaction(async (tx) => {
+        // Find or create Partner Wallet
+        let wallet = await tx.partnerWallet.findUnique({
+          where: { partnerEmail }
+        });
+
+        if (!wallet) {
+          wallet = await tx.partnerWallet.create({
+            data: {
+              partnerEmail,
+              partnerName,
+              partnerPhone: property.sellerPhone,
+              partnerRole,
+              availablePoints: pointsToAward,
+              reservedPoints: 0,
+              totalEarnedPoints: pointsToAward,
+              totalRedeemedPoints: 0
+            }
+          });
+        } else {
+          wallet = await tx.partnerWallet.update({
+            where: { partnerEmail },
+            data: {
+              availablePoints: { increment: pointsToAward },
+              totalEarnedPoints: { increment: pointsToAward },
+              ...(property.sellerName ? { partnerName: property.sellerName } : {}),
+              ...(property.sellerPhone ? { partnerPhone: property.sellerPhone } : {})
+            }
+          });
+        }
+
+        // Add Points Ledger transaction
+        await tx.pointsLedger.create({
+          data: {
+            partnerEmail,
+            partnerName,
+            partnerRole,
+            propertyId: property.id,
+            propertyTitle: property.title,
+            transactionType: 'PROPERTY_APPROVED',
+            points: pointsToAward,
+            balanceBefore: wallet.availablePoints - pointsToAward,
+            balanceAfter: wallet.availablePoints,
+            description: `Property #${property.id.slice(0, 8)} Approved: "${property.title}" (+${pointsToAward} Points)`,
+            adminId: adminUser?.id || adminUser?.sub || null,
+            adminName: adminUser?.name || 'Admin'
+          }
+        });
+
+        // Mark property as points awarded
+        await tx.property.update({
+          where: { id: propertyId },
+          data: { pointsAwarded: true }
+        });
+
+        // Legacy reward record
+        try {
+          await tx.reward.create({
+            data: {
+              userName: partnerName,
+              userEmail: partnerEmail,
+              userRole: partnerRole,
+              propertyTitle: property.title,
+              rewardTitle: 'Property Approved Reward',
+              points: pointsToAward,
+              amount: pointsToAward,
+              reason: `Property "${property.title}" approved by Admin. +${pointsToAward} points added.`,
+              status: 'APPROVED'
+            }
+          });
+        } catch (e) {
+          // ignore legacy duplicate log
+        }
+      });
+    } catch (err) {
+      console.error('Failed to award property approval points:', err);
+    }
+  }
+
   // 4. Update Property Status (APPROVE, REJECT, HOLD, PUBLISH) with optional planType tier assignment (GOLD / PREMIUM)
-  async updateStatus(id: string, status: string, planType?: string) {
+  async updateStatus(id: string, status: string, planType?: string, adminUser?: any) {
     const validStatuses = ['PENDING', 'APPROVED', 'REJECTED', 'HOLD'];
     const cleanStatus = status.toUpperCase();
     if (!validStatuses.includes(cleanStatus)) {
@@ -464,6 +537,11 @@ export class PropertiesService {
       data: updateData,
       include: { images: true }
     });
+
+    // Award +20 points ONLY when status is APPROVED for the first time
+    if (cleanStatus === 'APPROVED') {
+      await this.awardApprovalPointsIdempotent(id, adminUser);
+    }
 
     return {
       success: true,
@@ -509,6 +587,10 @@ export class PropertiesService {
       },
       include: { images: true }
     });
+
+    if (data.status && data.status.toUpperCase() === 'APPROVED') {
+      await this.awardApprovalPointsIdempotent(id, user);
+    }
 
     return { success: true, message: 'Property updated successfully', property: updated };
   }

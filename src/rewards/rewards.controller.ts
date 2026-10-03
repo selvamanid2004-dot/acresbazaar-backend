@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Param, Query, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Query, Body, UseGuards, Request } from '@nestjs/common';
 import { RewardsService } from './rewards.service';
 import { AdminGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../common/permissions/permissions.guard';
@@ -8,7 +8,38 @@ import { RequirePermissions } from '../common/permissions/permissions.decorator'
 export class RewardsController {
   constructor(private rewardsService: RewardsService) {}
 
-  // Public / Spotter endpoints
+  // =========================================================================
+  // PUBLIC / PARTNER ACCESSIBLE ENDPOINTS
+  // =========================================================================
+
+  // 1. Get Reward Conversion Config (Points required vs ₹ Amount)
+  @Get('config')
+  async getRewardConfig() {
+    return this.rewardsService.getRewardConfig();
+  }
+
+  // 2. Partner Wallet: Available points, reserved points, total earned, total redeemed, ledger & claims history
+  @Get('partner-wallet')
+  async getPartnerWallet(
+    @Query('email') email: string,
+    @Query('role') role?: string
+  ) {
+    return this.rewardsService.getPartnerWallet(email, role);
+  }
+
+  // 3. Save / Update Partner Bank Details
+  @Post('bank-detail')
+  async saveBankDetail(@Body() body: any) {
+    return this.rewardsService.saveBankDetail(body);
+  }
+
+  // 4. Partner Submit Reward Claim (500 pts OR All Points)
+  @Post('claim-reward')
+  async claimReward(@Body() body: any) {
+    return this.rewardsService.claimReward(body);
+  }
+
+  // Legacy Endpoints (Maintained for backward compatibility)
   @Post('claim')
   async submitClaim(@Body() body: any) {
     return this.rewardsService.submitClaim(body);
@@ -19,19 +50,69 @@ export class RewardsController {
     return this.rewardsService.getClaimByUser(email);
   }
 
-  // Dealer rewards summary (points, active claims, breakdown)
   @Get('dealer-summary')
   async getDealerSummary(@Query('email') email: string) {
     return this.rewardsService.getDealerRewardsSummary(email);
   }
 
-  // Spotter rewards summary (points, active claims, breakdown)
   @Get('spotter-summary')
   async getSpotterSummary(@Query('email') email: string) {
     return this.rewardsService.getSpotterRewardsSummary(email);
   }
 
-  // Admin endpoints
+  // =========================================================================
+  // ADMIN SECURED ENDPOINTS
+  // =========================================================================
+
+  // 5. Admin: Update Reward Conversion Setting (500 Pts = ₹Configurable)
+  @UseGuards(AdminGuard, PermissionsGuard)
+  @RequirePermissions('rewards')
+  @Patch('config')
+  async updateRewardConfig(@Body() body: any, @Request() req: any) {
+    return this.rewardsService.updateRewardConfig(body, req?.user);
+  }
+
+  // 6. Admin: Get all Reward Claims with filters, search, and summary dashboard metrics
+  @UseGuards(AdminGuard, PermissionsGuard)
+  @RequirePermissions('rewards')
+  @Get('claims')
+  async getAllClaimsAdmin(
+    @Query('status') status?: string,
+    @Query('partner') partner?: string,
+    @Query('search') search?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string
+  ) {
+    return this.rewardsService.getAllClaimsAdmin({ status, partner, search, startDate, endDate });
+  }
+
+  // 7. Admin: Get Partner complete profile (Property contributions, points history, claims, bank details)
+  @UseGuards(AdminGuard, PermissionsGuard)
+  @RequirePermissions('rewards')
+  @Get('partner-profile/:email')
+  async getPartnerProfileAdmin(@Param('email') email: string) {
+    return this.rewardsService.getPartnerProfileAdmin(email);
+  }
+
+  // 8. Admin: Process Claim (Mark as Paid with UTR/Ref ID, or Reject and release reserved points)
+  @UseGuards(AdminGuard, PermissionsGuard)
+  @RequirePermissions('rewards')
+  @Patch('claims/:id/process')
+  async processClaimAdmin(
+    @Param('id') id: string,
+    @Body() body: {
+      status: 'PROCESSING' | 'APPROVED' | 'PAID' | 'REJECTED';
+      paymentReference?: string;
+      paymentDate?: string;
+      adminNotes?: string;
+      rejectionReason?: string;
+    },
+    @Request() req: any
+  ) {
+    return this.rewardsService.processClaimAdmin(id, body, req?.user);
+  }
+
+  // Legacy Admin Endpoints
   @UseGuards(AdminGuard, PermissionsGuard)
   @RequirePermissions('rewards')
   @Get()
