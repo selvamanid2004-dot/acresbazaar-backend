@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Param, Query, Body, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Query, Body, UseGuards, Request, ForbiddenException } from '@nestjs/common';
 import { RewardsService } from './rewards.service';
 import { AdminGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../common/permissions/permissions.guard';
@@ -66,7 +66,7 @@ export class RewardsController {
 
   // 5. Admin: Update Reward Conversion Setting (500 Pts = ₹Configurable)
   @UseGuards(AdminGuard, PermissionsGuard)
-  @RequirePermissions('rewards')
+  @RequirePermissions('rewards.settings', 'rewards')
   @Patch('config')
   async updateRewardConfig(@Body() body: any, @Request() req: any) {
     return this.rewardsService.updateRewardConfig(body, req?.user);
@@ -74,7 +74,7 @@ export class RewardsController {
 
   // 6. Admin: Get all Reward Claims with filters, search, and summary dashboard metrics
   @UseGuards(AdminGuard, PermissionsGuard)
-  @RequirePermissions('rewards')
+  @RequirePermissions('rewards.view', 'rewards')
   @Get('claims')
   async getAllClaimsAdmin(
     @Query('status') status?: string,
@@ -88,7 +88,7 @@ export class RewardsController {
 
   // 7. Admin: Get Partner complete profile (Property contributions, points history, claims, bank details)
   @UseGuards(AdminGuard, PermissionsGuard)
-  @RequirePermissions('rewards')
+  @RequirePermissions('rewards.view', 'rewards')
   @Get('partner-profile/:email')
   async getPartnerProfileAdmin(@Param('email') email: string) {
     return this.rewardsService.getPartnerProfileAdmin(email);
@@ -96,7 +96,7 @@ export class RewardsController {
 
   // 8. Admin: Process Claim (Mark as Paid with UTR/Ref ID, or Reject and release reserved points)
   @UseGuards(AdminGuard, PermissionsGuard)
-  @RequirePermissions('rewards')
+  @RequirePermissions('rewards.approve', 'rewards.reject', 'rewards.process', 'rewards.mark_paid', 'rewards')
   @Patch('claims/:id/process')
   async processClaimAdmin(
     @Param('id') id: string,
@@ -109,12 +109,28 @@ export class RewardsController {
     },
     @Request() req: any
   ) {
+    const isSuper = req.user?.role === 'SUPER_ADMIN';
+    const userPerms: string[] = req.user?.permissions || [];
+    if (!isSuper) {
+      if (body.status === 'APPROVED' && !userPerms.includes('rewards') && !userPerms.includes('rewards.approve')) {
+        throw new ForbiddenException('Permission Denied: You do not have permission to approve reward claims (rewards.approve)');
+      }
+      if (body.status === 'REJECTED' && !userPerms.includes('rewards') && !userPerms.includes('rewards.reject')) {
+        throw new ForbiddenException('Permission Denied: You do not have permission to reject reward claims (rewards.reject)');
+      }
+      if (body.status === 'PROCESSING' && !userPerms.includes('rewards') && !userPerms.includes('rewards.process')) {
+        throw new ForbiddenException('Permission Denied: You do not have permission to process reward claims (rewards.process)');
+      }
+      if (body.status === 'PAID' && !userPerms.includes('rewards') && !userPerms.includes('rewards.mark_paid')) {
+        throw new ForbiddenException('Permission Denied: You do not have permission to mark reward claims as paid (rewards.mark_paid)');
+      }
+    }
     return this.rewardsService.processClaimAdmin(id, body, req?.user);
   }
 
   // Legacy Admin Endpoints
   @UseGuards(AdminGuard, PermissionsGuard)
-  @RequirePermissions('rewards')
+  @RequirePermissions('rewards.view', 'rewards')
   @Get()
   async findAll(@Query('status') status?: string, @Query('role') role?: string) {
     return this.rewardsService.findAll(status, role);

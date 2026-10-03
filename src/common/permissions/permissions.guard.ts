@@ -48,7 +48,7 @@ export class PermissionsGuard implements CanActivate {
     request.user.role = admin.role;
     request.user.isActive = admin.isActive;
 
-    // Super Admin has unrestricted bypass across all modules
+    // Super Admin has unrestricted bypass across all modules & actions
     if (admin.role === 'SUPER_ADMIN') {
       return true;
     }
@@ -71,28 +71,75 @@ export class PermissionsGuard implements CanActivate {
     request.user.permissions = userPermissions;
 
     // Check if user has ANY of the required permissions for this route
-    const hasPermission = requiredPermissions.some((perm) => {
-      if (userPermissions.includes(perm)) return true;
-      // Hierarchical fallbacks:
-      if (perm === 'buyers' && userPermissions.includes('customers')) return true;
-      if (perm === 'sellers' && userPermissions.includes('customers')) return true;
-      if (perm === 'dealers' && userPermissions.includes('customers')) return true;
-      if (perm === 'common_people' && userPermissions.includes('customers')) return true;
-      if (perm === 'gold_properties' && userPermissions.includes('properties')) return true;
-      if (perm === 'premium_properties' && userPermissions.includes('properties')) return true;
-      if (perm === 'snap_properties' && userPermissions.includes('properties')) return true;
-      if (perm === 'bookings' && userPermissions.includes('properties')) return true;
-      if (perm === 'contact_details' && userPermissions.includes('website_settings')) return true;
-      if (perm === 'logo_management' && userPermissions.includes('website_settings')) return true;
-      return false;
+    const hasPermission = requiredPermissions.some((requiredPerm) => {
+      return this.evaluatePermission(userPermissions, requiredPerm);
     });
 
     if (!hasPermission) {
       throw new ForbiddenException(
-        `Access Denied: You do not have permission to access this module (${requiredPermissions.join(', ')})`,
+        `Permission Denied: You do not have permission for this action (${requiredPermissions.join(', ')})`,
       );
     }
 
     return true;
+  }
+
+  private evaluatePermission(userPermissions: string[], required: string): boolean {
+    // 1. Direct exact match (e.g. 'properties.delete' or 'properties')
+    if (userPermissions.includes(required)) return true;
+
+    // 2. If required is an action e.g. "properties.delete"
+    if (required.includes('.')) {
+      const [moduleName, actionName] = required.split('.');
+
+      // If user has full access to the parent module (e.g. 'properties')
+      if (userPermissions.includes(moduleName)) return true;
+
+      // Group/Hierarchical fallbacks
+      if (['gold_properties', 'premium_properties', 'snap_properties'].includes(moduleName)) {
+        if (userPermissions.includes('properties')) return true;
+        if (userPermissions.includes(`properties.${actionName}`)) return true;
+      }
+
+      if (['buyers', 'sellers', 'dealers', 'common_people'].includes(moduleName)) {
+        if (userPermissions.includes('customers')) return true;
+        if (userPermissions.includes(`customers.${actionName}`)) return true;
+      }
+
+      if (['contact_details', 'logo_management'].includes(moduleName)) {
+        if (userPermissions.includes('website_settings')) return true;
+        if (userPermissions.includes(`website_settings.${actionName}`)) return true;
+      }
+
+      return false;
+    }
+
+    // 3. If required is a module-level permission e.g. "properties"
+    // User has access if they have the module itself OR any action inside that module
+    const hasAnyActionInModule = userPermissions.some(
+      (p) => p === required || p.startsWith(`${required}.`),
+    );
+    if (hasAnyActionInModule) return true;
+
+    // Hierarchical module fallbacks
+    if (required === 'buyers' || required === 'sellers' || required === 'dealers' || required === 'common_people') {
+      if (userPermissions.includes('customers') || userPermissions.some((p) => p.startsWith('customers.'))) {
+        return true;
+      }
+    }
+
+    if (required === 'gold_properties' || required === 'premium_properties' || required === 'snap_properties' || required === 'bookings') {
+      if (userPermissions.includes('properties') || userPermissions.some((p) => p.startsWith('properties.'))) {
+        return true;
+      }
+    }
+
+    if (required === 'contact_details' || required === 'logo_management') {
+      if (userPermissions.includes('website_settings') || userPermissions.some((p) => p.startsWith('website_settings.'))) {
+        return true;
+      }
+    }
+
+    return false;
   }
 }

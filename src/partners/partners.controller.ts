@@ -19,14 +19,14 @@ export class PartnersController {
   }
 
   @UseGuards(AdminGuard, PermissionsGuard)
-  @RequirePermissions('verified_partners')
+  @RequirePermissions('verified_partners.approve', 'verified_partners.reject', 'verified_partners.update', 'verified_partners')
   @Patch(':id/status')
   async updateStatus(@Param('id') id: string, @Body() body: { status: string }) {
     return this.partnersService.updateStatus(id, body.status);
   }
 
   @UseGuards(AdminGuard, PermissionsGuard)
-  @RequirePermissions('verified_partners')
+  @RequirePermissions('verified_partners.delete', 'verified_partners.update', 'verified_partners')
   @Delete(':id')
   async delete(@Param('id') id: string) {
     return this.partnersService.delete(id);

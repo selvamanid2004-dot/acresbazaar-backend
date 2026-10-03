@@ -20,28 +20,28 @@ export class CategoriesController {
   }
 
   @UseGuards(AdminGuard, PermissionsGuard)
-  @RequirePermissions('categories')
+  @RequirePermissions('categories.create', 'categories')
   @Post()
   async create(@Body() body: any) {
     return this.categoriesService.create(body);
   }
 
   @UseGuards(AdminGuard, PermissionsGuard)
-  @RequirePermissions('categories')
+  @RequirePermissions('categories.update', 'categories')
   @Patch(':id')
   async update(@Param('id') id: string, @Body() body: any) {
     return this.categoriesService.update(id, body);
   }
 
   @UseGuards(AdminGuard, PermissionsGuard)
-  @RequirePermissions('categories')
+  @RequirePermissions('categories.update', 'categories')
   @Patch(':id/toggle-status')
   async toggleStatus(@Param('id') id: string) {
     return this.categoriesService.toggleStatus(id);
   }
 
   @UseGuards(AdminGuard, PermissionsGuard)
-  @RequirePermissions('categories')
+  @RequirePermissions('categories.delete', 'categories')
   @Delete(':id')
   async delete(@Param('id') id: string) {
     return this.categoriesService.delete(id);

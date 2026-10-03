@@ -22,7 +22,7 @@ export class PlansController {
 
   // Admin: Edit Gold or Platinum plan
   @UseGuards(AdminGuard, PermissionsGuard)
-  @RequirePermissions('plans')
+  @RequirePermissions('plans.update', 'plans')
   @Patch(':planId')
   async update(@Param('planId') planId: string, @Body() body: any) {
     return this.plansService.update(planId.toLowerCase(), body);

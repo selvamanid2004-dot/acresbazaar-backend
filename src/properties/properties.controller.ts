@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Param, Query, Body, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Query, Body, UseGuards, Request, ForbiddenException } from '@nestjs/common';
 import { PropertiesService } from './properties.service';
 import { AdminGuard, JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../common/permissions/permissions.guard';
@@ -69,7 +69,7 @@ export class PropertiesController {
 
   // Admin endpoint: List all properties with status tabs (PENDING, APPROVED, HOLD, REJECTED, ALL)
   @UseGuards(AdminGuard, PermissionsGuard)
-  @RequirePermissions('properties', 'gold_properties', 'premium_properties', 'snap_properties')
+  @RequirePermissions('properties.view', 'properties', 'gold_properties.view', 'premium_properties.view', 'snap_properties.view')
   @Get('admin/all')
   async findAllAdmin(
     @Query('status') status?: string,
@@ -83,7 +83,7 @@ export class PropertiesController {
   }
 
   @UseGuards(AdminGuard, PermissionsGuard)
-  @RequirePermissions('properties', 'gold_properties', 'premium_properties', 'snap_properties')
+  @RequirePermissions('properties.view', 'properties', 'gold_properties.view', 'premium_properties.view', 'snap_properties.view')
   @Get()
   async findAll(
     @Query('status') status?: string,
@@ -121,7 +121,7 @@ export class PropertiesController {
 
   // Admin: Get all property bookings (Filterable by Buyer vs Dealer, Gold vs Premium Plan, and Status)
   @UseGuards(AdminGuard, PermissionsGuard)
-  @RequirePermissions('bookings', 'properties', 'gold_properties', 'premium_properties')
+  @RequirePermissions('bookings.view', 'bookings', 'properties.view', 'properties')
   @Get('admin/bookings')
   async findAllBookingsAdmin(
     @Query('role') role?: string,
@@ -134,7 +134,7 @@ export class PropertiesController {
 
   // Admin: Update Booking status
   @UseGuards(AdminGuard, PermissionsGuard)
-  @RequirePermissions('bookings', 'properties', 'gold_properties', 'premium_properties')
+  @RequirePermissions('bookings.update', 'bookings', 'properties.update', 'properties')
   @Patch('admin/bookings/:id/status')
   async updateBookingStatus(
     @Param('id') id: string,
@@ -157,13 +157,39 @@ export class PropertiesController {
 
   // Admin: Update Status (APPROVE, REJECT, HOLD, PUBLISH) + optional tier/plan selection
   @UseGuards(AdminGuard, PermissionsGuard)
-  @RequirePermissions('properties')
+  @RequirePermissions('properties.approve', 'properties.reject', 'properties.update', 'properties')
   @Patch(':id/status')
   async updateStatus(
     @Param('id') id: string, 
     @Body() body: { status: string; planType?: string; tier?: string },
     @Request() req: any
   ) {
+    const cleanStatus = (body.status || '').toUpperCase();
+    const userPerms: string[] = req.user?.permissions || [];
+    const isSuper = req.user?.role === 'SUPER_ADMIN';
+
+    if (!isSuper) {
+      if (cleanStatus === 'APPROVED') {
+        const canApprove = userPerms.includes('properties') || 
+                           userPerms.includes('properties.approve') || 
+                           userPerms.includes('gold_properties.approve') || 
+                           userPerms.includes('premium_properties.approve') || 
+                           userPerms.includes('snap_properties.approve');
+        if (!canApprove) {
+          throw new ForbiddenException('Permission Denied: You do not have permission to approve properties (properties.approve)');
+        }
+      } else if (cleanStatus === 'REJECTED' || cleanStatus === 'HOLD') {
+        const canReject = userPerms.includes('properties') || 
+                          userPerms.includes('properties.reject') || 
+                          userPerms.includes('gold_properties.reject') || 
+                          userPerms.includes('premium_properties.reject') || 
+                          userPerms.includes('snap_properties.reject');
+        if (!canReject) {
+          throw new ForbiddenException('Permission Denied: You do not have permission to reject or hold properties (properties.reject)');
+        }
+      }
+    }
+
     const tier = body.planType || body.tier;
     return this.propertiesService.updateStatus(id, body.status, tier, req?.user);
   }
@@ -171,6 +197,13 @@ export class PropertiesController {
   // Edit property details (Seller/Dealer can edit their own, Admin can edit any)
   @Patch(':id')
   async update(@Param('id') id: string, @Body() body: any, @Request() req: any) {
+    if (req.user && req.user.type === 'admin' && req.user.role !== 'SUPER_ADMIN') {
+      const userPerms: string[] = req.user.permissions || [];
+      const canEdit = userPerms.includes('properties') || userPerms.includes('properties.update');
+      if (!canEdit) {
+        throw new ForbiddenException('Permission Denied: You do not have permission to edit properties (properties.update)');
+      }
+    }
     return this.propertiesService.update(id, body, req?.user);
   }
 
@@ -181,6 +214,13 @@ export class PropertiesController {
     @Param('imageId') imageId: string,
     @Request() req: any
   ) {
+    if (req.user && req.user.type === 'admin' && req.user.role !== 'SUPER_ADMIN') {
+      const userPerms: string[] = req.user.permissions || [];
+      const canEdit = userPerms.includes('properties') || userPerms.includes('properties.update');
+      if (!canEdit) {
+        throw new ForbiddenException('Permission Denied: You do not have permission to edit property images (properties.update)');
+      }
+    }
     return this.propertiesService.setCoverImage(id, imageId, req?.user);
   }
 
@@ -191,6 +231,13 @@ export class PropertiesController {
     @Param('imageId') imageId: string,
     @Request() req: any
   ) {
+    if (req.user && req.user.type === 'admin' && req.user.role !== 'SUPER_ADMIN') {
+      const userPerms: string[] = req.user.permissions || [];
+      const canDel = userPerms.includes('properties') || userPerms.includes('properties.delete') || userPerms.includes('properties.update');
+      if (!canDel) {
+        throw new ForbiddenException('Permission Denied: You do not have permission to delete property images (properties.delete)');
+      }
+    }
     return this.propertiesService.deleteImage(id, imageId, req?.user);
   }
 
@@ -201,12 +248,26 @@ export class PropertiesController {
     @Body() body: { images: any[] },
     @Request() req: any
   ) {
+    if (req.user && req.user.type === 'admin' && req.user.role !== 'SUPER_ADMIN') {
+      const userPerms: string[] = req.user.permissions || [];
+      const canAdd = userPerms.includes('properties') || userPerms.includes('properties.create') || userPerms.includes('properties.update');
+      if (!canAdd) {
+        throw new ForbiddenException('Permission Denied: You do not have permission to add property images (properties.update)');
+      }
+    }
     return this.propertiesService.addImages(id, body.images, req?.user);
   }
 
   // Delete property (Seller/Dealer can delete their own, Admin can delete any)
   @Delete(':id')
   async delete(@Param('id') id: string, @Request() req: any) {
+    if (req.user && req.user.type === 'admin' && req.user.role !== 'SUPER_ADMIN') {
+      const userPerms: string[] = req.user.permissions || [];
+      const canDelete = userPerms.includes('properties') || userPerms.includes('properties.delete');
+      if (!canDelete) {
+        throw new ForbiddenException('Permission Denied: You do not have permission to delete properties (properties.delete)');
+      }
+    }
     return this.propertiesService.delete(id, req?.user);
   }
 }

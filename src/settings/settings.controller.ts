@@ -22,7 +22,7 @@ export class SettingsController {
 
   // Admin: Save settings
   @UseGuards(AdminGuard, PermissionsGuard)
-  @RequirePermissions('website_settings', 'contact_details', 'logo_management')
+  @RequirePermissions('website_settings.update', 'contact_details.update', 'logo_management.update', 'website_settings', 'contact_details', 'logo_management')
   @Post()
   async update(@Body() body: { items: { key: string; value: string; group?: string }[] }) {
     return this.settingsService.updateSettings(body.items || []);
@@ -30,7 +30,7 @@ export class SettingsController {
 
   // Admin: Upload logo directly from computer/mobile
   @UseGuards(AdminGuard, PermissionsGuard)
-  @RequirePermissions('logo_management', 'website_settings')
+  @RequirePermissions('logo_management.update', 'website_settings.update', 'logo_management', 'website_settings')
   @Post('upload-logo')
   async uploadLogo(@Body() body: { image: string; fileName?: string }) {
     return this.settingsService.uploadLogo(body.image, body.fileName);
@@ -38,7 +38,7 @@ export class SettingsController {
 
   // Admin: Upload banner or section graphic image directly
   @UseGuards(AdminGuard, PermissionsGuard)
-  @RequirePermissions('website_settings')
+  @RequirePermissions('website_settings.update', 'website_settings')
   @Post('upload-image')
   async uploadImage(@Body() body: { image: string; key: string; group?: string }) {
     return this.settingsService.uploadImage(body.image, body.key, body.group || 'home');
@@ -46,7 +46,7 @@ export class SettingsController {
 
   // Admin: Remove logo
   @UseGuards(AdminGuard, PermissionsGuard)
-  @RequirePermissions('logo_management', 'website_settings')
+  @RequirePermissions('logo_management.update', 'website_settings.update', 'logo_management', 'website_settings')
   @Delete('logo')
   async removeLogo() {
     return this.settingsService.removeLogo();
