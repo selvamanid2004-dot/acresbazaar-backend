@@ -552,7 +552,7 @@ export class PropertiesService {
 
   // 5. Update Property Details (Strict Ownership Check for non-admin)
   async update(id: string, data: any, user?: any) {
-    const property = await this.prisma.property.findUnique({ where: { id } });
+    const property = await this.prisma.property.findUnique({ where: { id }, include: { images: true } });
     if (!property) {
       throw new NotFoundException('Property not found');
     }
@@ -571,6 +571,28 @@ export class PropertiesService {
       ? JSON.stringify(data.categorySpecs)
       : data.categorySpecs;
 
+    // Handle images update if provided
+    if (Array.isArray(data.images)) {
+      const cleanImages = data.images
+        .map((img: any) => (typeof img === 'string' ? img : (img?.imageUrl || img?.url || '')))
+        .filter((url: string) => typeof url === 'string' && url.trim().length > 0)
+        .map((url: string) => saveBase64Image(url, data.category || property.category));
+
+      if (cleanImages.length > 0) {
+        await this.prisma.propertyImage.deleteMany({ where: { propertyId: id } });
+        for (let idx = 0; idx < cleanImages.length; idx++) {
+          await this.prisma.propertyImage.create({
+            data: {
+              propertyId: id,
+              imageUrl: cleanImages[idx],
+              isPrimary: idx === 0,
+              displayOrder: idx
+            }
+          });
+        }
+      }
+    }
+
     const updated = await this.prisma.property.update({
       where: { id },
       data: {
@@ -585,7 +607,7 @@ export class PropertiesService {
         ...(data.status ? { status: data.status.toUpperCase() } : {}),
         ...(specsStr !== undefined ? { categorySpecs: specsStr } : {})
       },
-      include: { images: true }
+      include: { images: { orderBy: { displayOrder: 'asc' } }, seller: true }
     });
 
     if (data.status && data.status.toUpperCase() === 'APPROVED') {
@@ -593,6 +615,98 @@ export class PropertiesService {
     }
 
     return { success: true, message: 'Property updated successfully', property: updated };
+  }
+
+  // 5b. Set Cover / Primary Image for a property
+  async setCoverImage(propertyId: string, imageId: string, user?: any) {
+    const property = await this.prisma.property.findUnique({ where: { id: propertyId } });
+    if (!property) throw new NotFoundException('Property not found');
+
+    if (user && user.role !== 'SUPER_ADMIN' && user.role !== 'ADMIN' && user.type !== 'admin') {
+      const isOwner = property.sellerId === user.sub || property.sellerId === user.id || (user.email && property.sellerEmail?.toLowerCase() === user.email.toLowerCase());
+      if (!isOwner) throw new ForbiddenException('Access denied');
+    }
+
+    // Set all images of this property to non-primary
+    await this.prisma.propertyImage.updateMany({
+      where: { propertyId },
+      data: { isPrimary: false }
+    });
+
+    // Set target image to primary and top displayOrder
+    await this.prisma.propertyImage.update({
+      where: { id: imageId },
+      data: { isPrimary: true, displayOrder: 0 }
+    });
+
+    return { success: true, message: 'Cover image updated successfully' };
+  }
+
+  // 5c. Delete a single image from a property
+  async deleteImage(propertyId: string, imageId: string, user?: any) {
+    const property = await this.prisma.property.findUnique({ where: { id: propertyId } });
+    if (!property) throw new NotFoundException('Property not found');
+
+    if (user && user.role !== 'SUPER_ADMIN' && user.role !== 'ADMIN' && user.type !== 'admin') {
+      const isOwner = property.sellerId === user.sub || property.sellerId === user.id || (user.email && property.sellerEmail?.toLowerCase() === user.email.toLowerCase());
+      if (!isOwner) throw new ForbiddenException('Access denied');
+    }
+
+    const imgToDelete = await this.prisma.propertyImage.findUnique({ where: { id: imageId } });
+    if (!imgToDelete) throw new NotFoundException('Image not found');
+
+    await this.prisma.propertyImage.delete({ where: { id: imageId } });
+
+    // If deleted image was primary, set first remaining image as primary
+    const remaining = await this.prisma.propertyImage.findMany({
+      where: { propertyId },
+      orderBy: { displayOrder: 'asc' }
+    });
+
+    if (remaining.length > 0 && !remaining.some(img => img.isPrimary)) {
+      await this.prisma.propertyImage.update({
+        where: { id: remaining[0].id },
+        data: { isPrimary: true, displayOrder: 0 }
+      });
+    }
+
+    return { success: true, message: 'Image deleted successfully' };
+  }
+
+  // 5d. Add more images to a property
+  async addImages(propertyId: string, newImages: any[], user?: any) {
+    const property = await this.prisma.property.findUnique({ where: { id: propertyId } });
+    if (!property) throw new NotFoundException('Property not found');
+
+    if (user && user.role !== 'SUPER_ADMIN' && user.role !== 'ADMIN' && user.type !== 'admin') {
+      const isOwner = property.sellerId === user.sub || property.sellerId === user.id || (user.email && property.sellerEmail?.toLowerCase() === user.email.toLowerCase());
+      if (!isOwner) throw new ForbiddenException('Access denied');
+    }
+
+    const cleanImages = (newImages || [])
+      .map((img: any) => (typeof img === 'string' ? img : (img?.imageUrl || img?.url || '')))
+      .filter((url: string) => typeof url === 'string' && url.trim().length > 0)
+      .map((url: string) => saveBase64Image(url, property.category));
+
+    const existingCount = await this.prisma.propertyImage.count({ where: { propertyId } });
+
+    for (let idx = 0; idx < cleanImages.length; idx++) {
+      await this.prisma.propertyImage.create({
+        data: {
+          propertyId,
+          imageUrl: cleanImages[idx],
+          isPrimary: existingCount === 0 && idx === 0,
+          displayOrder: existingCount + idx
+        }
+      });
+    }
+
+    const updatedImages = await this.prisma.propertyImage.findMany({
+      where: { propertyId },
+      orderBy: { displayOrder: 'asc' }
+    });
+
+    return { success: true, message: 'Images added successfully', images: updatedImages };
   }
 
   // 6. Delete Property (Strict Ownership Check for non-admin)
@@ -817,9 +931,30 @@ export class PropertiesService {
         const planNormalized = (p.planType || 'PLATINUM').toUpperCase();
         const tier = planNormalized === 'GOLD' ? 'gold' : 'platinum';
 
-        const rawMain = p.images && p.images[0] ? p.images[0].imageUrl : null;
-        const mainImage = rawMain ? saveBase64Image(rawMain, p.category) : getCategoryFallbackImage(p.category);
-        const galleryImages = (p.images || []).map(img => img.imageUrl ? saveBase64Image(img.imageUrl, p.category) : getCategoryFallbackImage(p.category));
+        const rawImages = (p.images || []).map((img, idx) => ({
+          id: img.id,
+          propertyId: img.propertyId,
+          imageUrl: img.imageUrl ? saveBase64Image(img.imageUrl, p.category) : getCategoryFallbackImage(p.category),
+          isPrimary: img.isPrimary,
+          displayOrder: img.displayOrder ?? idx
+        }));
+
+        if (rawImages.length === 0) {
+          rawImages.push({
+            id: `fallback-${p.id}`,
+            propertyId: p.id,
+            imageUrl: getCategoryFallbackImage(p.category),
+            isPrimary: true,
+            displayOrder: 0
+          });
+        }
+
+        const coverObj = rawImages.find(i => i.isPrimary) || rawImages[0];
+        const mainImage = coverObj.imageUrl;
+        const galleryImages = [
+          coverObj.imageUrl,
+          ...rawImages.filter(i => i.id !== coverObj.id).map(i => i.imageUrl)
+        ];
 
         return {
           id: p.id,
@@ -834,7 +969,11 @@ export class PropertiesService {
           city: p.city,
           description: p.description,
           imageUrl: mainImage,
+          coverImage: mainImage,
           galleryImages: galleryImages,
+          images: rawImages,
+          totalImages: galleryImages.length,
+          imageCount: galleryImages.length,
           specs,
           sellerName: p.sellerName || p.seller?.name || 'Verified Partner',
           sellerPhone: p.sellerPhone || p.seller?.mobile,

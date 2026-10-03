@@ -174,6 +174,36 @@ export class PropertiesController {
     return this.propertiesService.update(id, body, req?.user);
   }
 
+  // Set cover / primary image for a property
+  @Patch(':id/images/:imageId/cover')
+  async setCoverImage(
+    @Param('id') id: string,
+    @Param('imageId') imageId: string,
+    @Request() req: any
+  ) {
+    return this.propertiesService.setCoverImage(id, imageId, req?.user);
+  }
+
+  // Delete an individual image from a property
+  @Delete(':id/images/:imageId')
+  async deleteImage(
+    @Param('id') id: string,
+    @Param('imageId') imageId: string,
+    @Request() req: any
+  ) {
+    return this.propertiesService.deleteImage(id, imageId, req?.user);
+  }
+
+  // Add more images to a property
+  @Post(':id/images')
+  async addImages(
+    @Param('id') id: string,
+    @Body() body: { images: any[] },
+    @Request() req: any
+  ) {
+    return this.propertiesService.addImages(id, body.images, req?.user);
+  }
+
   // Delete property (Seller/Dealer can delete their own, Admin can delete any)
   @Delete(':id')
   async delete(@Param('id') id: string, @Request() req: any) {
