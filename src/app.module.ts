@@ -20,6 +20,7 @@ import { CalendarModule } from './calendar/calendar.module';
 import { ExportModule } from './export/export.module';
 import { ActivitiesModule } from './activities/activities.module';
 import { StaffModule } from './staff/staff.module';
+import { BannersModule } from './banners/banners.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { StaffModule } from './staff/staff.module';
     ExportModule,
     ActivitiesModule,
     StaffModule,
+    BannersModule,
   ],
   providers: [
     {

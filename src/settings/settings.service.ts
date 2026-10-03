@@ -138,8 +138,7 @@ export class SettingsService {
           const savedName = `banner-${cleanKey}-${Date.now()}.${ext}`;
           const filePath = path.join(uploadsDir, savedName);
           fs.writeFileSync(filePath, buffer);
-          const port = process.env.PORT || 5001;
-          imageUrl = `http://localhost:${port}/uploads/${savedName}`;
+          imageUrl = `/uploads/${savedName}`;
         }
       }
     } catch (err) {

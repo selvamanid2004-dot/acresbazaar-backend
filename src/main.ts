@@ -35,14 +35,17 @@ async function bootstrap() {
   app.use('/uploads', (req: any, res: any, next: any) => {
     const reqPath = (req.path || '').toLowerCase();
     if (reqPath.includes('logo')) {
-      const defaultLogo = join(uploadsDir, 'logo-1790858548202.jpg');
-      if (fs.existsSync(defaultLogo)) {
-        return res.sendFile(defaultLogo);
-      }
-      const altLogo = join(uploadsDir, 'logo-1790321825874.jpg');
-      if (fs.existsSync(altLogo)) {
-        return res.sendFile(altLogo);
-      }
+      try {
+        const files = fs.readdirSync(uploadsDir).filter(f => f.toLowerCase().startsWith('logo-'));
+        if (files.length > 0) {
+          // Serve newest logo on disk
+          files.sort().reverse();
+          const latestLogo = join(uploadsDir, files[0]);
+          if (fs.existsSync(latestLogo)) {
+            return res.sendFile(latestLogo);
+          }
+        }
+      } catch {}
     }
     return res.redirect('https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80');
   });
