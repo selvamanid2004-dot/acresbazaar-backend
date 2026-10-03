@@ -118,6 +118,61 @@ function normalizeCategoryTerms(catSlugOrName: string): string[] {
   return [catSlugOrName];
 }
 
+function extractOwnerContact(property: any) {
+  let specs: any = {};
+  try {
+    if (typeof property.categorySpecs === 'string') {
+      specs = JSON.parse(property.categorySpecs);
+    } else if (property.categorySpecs && typeof property.categorySpecs === 'object') {
+      specs = property.categorySpecs;
+    }
+  } catch {}
+
+  const isSnap = specs?.isSnapProperty || (property.sellerRole === 'COMMON_PEOPLE') || (property.sellerRole === 'PARTNER');
+
+  // 1. Phone: prioritize snap boardContact, then property-specific sellerPhone, then specs.ownerPhone
+  let phone = '';
+  if (isSnap && specs?.boardContact) {
+    phone = specs.boardContact.trim();
+  } else if (property.sellerPhone && property.sellerPhone.trim()) {
+    phone = property.sellerPhone.trim();
+  } else if (specs?.ownerPhone || specs?.owner_phone || specs?.contactPhone) {
+    phone = (specs.ownerPhone || specs.owner_phone || specs.contactPhone).trim();
+  } else if (property.seller?.mobile && property.seller?.mobile.trim()) {
+    phone = property.seller.mobile.trim();
+  }
+
+  // 2. Name: prioritize property-specific sellerName / ownerName
+  let name = '';
+  if (property.sellerName && property.sellerName.trim() && !['partner', 'community partner', 'spotter', 'verified partner'].includes(property.sellerName.toLowerCase())) {
+    name = property.sellerName.trim();
+  } else if (specs?.ownerName || specs?.owner_name || specs?.boardContactName || specs?.contactName) {
+    name = (specs.ownerName || specs.owner_name || specs.boardContactName || specs.contactName).trim();
+  } else if (isSnap) {
+    name = 'Property Owner';
+  } else if (property.seller?.name) {
+    name = property.seller.name;
+  } else {
+    name = 'Property Owner';
+  }
+
+  // 3. Email: prioritize property-specific sellerEmail / ownerEmail
+  let email = '';
+  if (property.sellerEmail && property.sellerEmail.trim() && !property.sellerEmail.includes('partner@') && !property.sellerEmail.includes('spotter@')) {
+    email = property.sellerEmail.trim();
+  } else if (specs?.ownerEmail || specs?.owner_email) {
+    email = (specs.ownerEmail || specs.owner_email).trim();
+  } else if (!isSnap && property.seller?.email) {
+    email = property.seller.email;
+  }
+
+  return {
+    name,
+    phone,
+    email
+  };
+}
+
 @Injectable()
 export class PropertiesService {
   constructor(private prisma: PrismaService) {}
@@ -197,7 +252,13 @@ export class PropertiesService {
           displayOrder: 0
         } as any];
       }
-      return { ...p, images: imgs };
+      const owner_contact = extractOwnerContact(p);
+      return { 
+        ...p, 
+        images: imgs,
+        owner_contact,
+        ownerContact: owner_contact
+      };
     });
 
     return { success: true, count: sanitizedProperties.length, properties: sanitizedProperties };
@@ -229,7 +290,16 @@ export class PropertiesService {
         displayOrder: 0
       } as any];
     }
-    return { success: true, property: { ...property, images: imgs } };
+    const owner_contact = extractOwnerContact(property);
+    return { 
+      success: true, 
+      property: { 
+        ...property, 
+        images: imgs,
+        owner_contact,
+        ownerContact: owner_contact
+      } 
+    };
   }
 
   // 3. Create Property (Seller, Dealer, Partner, or Admin quick-post)
@@ -975,8 +1045,11 @@ export class PropertiesService {
           totalImages: galleryImages.length,
           imageCount: galleryImages.length,
           specs,
-          sellerName: p.sellerName || p.seller?.name || 'Verified Partner',
-          sellerPhone: p.sellerPhone || p.seller?.mobile,
+          owner_contact: extractOwnerContact(p),
+          ownerContact: extractOwnerContact(p),
+          sellerName: extractOwnerContact(p).name,
+          sellerPhone: extractOwnerContact(p).phone,
+          sellerEmail: extractOwnerContact(p).email,
           status: p.status,
           createdAt: p.createdAt
         };
