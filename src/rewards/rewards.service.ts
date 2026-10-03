@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -213,6 +213,19 @@ export class RewardsService {
 
     const cleanEmail = email.trim().toLowerCase();
 
+    // Verify if user is a SELLER in database
+    const user = await this.prisma.user.findUnique({
+      where: { email: cleanEmail }
+    });
+
+    if (user && user.role?.toUpperCase() === 'SELLER') {
+      throw new ForbiddenException('Access denied. Sellers are not authorized to access Partner points and rewards.');
+    }
+
+    if (userRole && userRole.toUpperCase() === 'SELLER') {
+      throw new ForbiddenException('Access denied. Sellers are not authorized to access Partner points and rewards.');
+    }
+
     // Load conversion config
     const configRes = await this.getRewardConfig();
     const config = configRes.config;
@@ -233,11 +246,6 @@ export class RewardsService {
     });
 
     if (!wallet) {
-      // Find if user exists
-      const user = await this.prisma.user.findUnique({
-        where: { email: cleanEmail }
-      });
-
       wallet = await this.prisma.partnerWallet.create({
         data: {
           partnerEmail: cleanEmail,
@@ -299,6 +307,15 @@ export class RewardsService {
     }
 
     const cleanEmail = data.email.trim().toLowerCase();
+
+    // Verify if user is a SELLER in database
+    const user = await this.prisma.user.findUnique({
+      where: { email: cleanEmail }
+    });
+
+    if (user && user.role?.toUpperCase() === 'SELLER') {
+      throw new ForbiddenException('Access denied. Sellers are not authorized to manage Partner bank details.');
+    }
 
     // Ensure wallet exists
     await this.prisma.partnerWallet.upsert({
@@ -372,6 +389,19 @@ export class RewardsService {
     }
 
     const cleanEmail = data.email.trim().toLowerCase();
+
+    // Verify if user is a SELLER in database
+    const user = await this.prisma.user.findUnique({
+      where: { email: cleanEmail }
+    });
+
+    if (user && user.role?.toUpperCase() === 'SELLER') {
+      throw new ForbiddenException('Access denied. Sellers are not authorized to claim Partner rewards.');
+    }
+
+    if (data.role && data.role.toUpperCase() === 'SELLER') {
+      throw new ForbiddenException('Access denied. Sellers are not authorized to claim Partner rewards.');
+    }
 
     return this.prisma.$transaction(async (tx) => {
       // 1. Get wallet
@@ -984,8 +1014,18 @@ export class RewardsService {
 
   async getClaimByUser(email: string) {
     if (!email) return { success: true, claim: null };
+    const cleanEmail = email.trim().toLowerCase();
+
+    const user = await this.prisma.user.findUnique({
+      where: { email: cleanEmail }
+    });
+
+    if (user && user.role?.toUpperCase() === 'SELLER') {
+      throw new ForbiddenException('Access denied. Sellers cannot view Partner reward claims.');
+    }
+
     const claim = await this.prisma.rewardClaim.findFirst({
-      where: { partnerEmail: email.trim().toLowerCase() },
+      where: { partnerEmail: cleanEmail },
       orderBy: { createdAt: 'desc' }
     });
     return { success: true, claim };

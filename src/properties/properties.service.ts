@@ -1179,7 +1179,12 @@ export class PropertiesService {
 
     const where: any = { OR: conditions };
     if (filter.role && filter.role.trim() && filter.role.toUpperCase() !== 'ALL') {
-      where.sellerRole = filter.role.trim().toUpperCase();
+      const cleanRole = filter.role.trim().toUpperCase();
+      if (cleanRole === 'COMMON_PEOPLE' || cleanRole === 'PARTNER') {
+        where.sellerRole = { in: ['COMMON_PEOPLE', 'PARTNER'] };
+      } else {
+        where.sellerRole = cleanRole;
+      }
     }
 
     const properties = await this.prisma.property.findMany({
