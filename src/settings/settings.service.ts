@@ -46,6 +46,28 @@ export class SettingsService {
         }
       });
       updatedList.push(updated);
+
+      // Bidirectional sync: keep banner table in sync when hero settings are updated
+      try {
+        if (item.key === 'hero_title' || item.key === 'hero_headline') {
+          const firstBanner = await this.prisma.banner.findFirst({ orderBy: { sortOrder: 'asc' } });
+          if (firstBanner) {
+            await this.prisma.banner.update({ where: { id: firstBanner.id }, data: { title: item.value } });
+          }
+        } else if (item.key === 'hero_subtitle' || item.key === 'hero_subheading') {
+          const firstBanner = await this.prisma.banner.findFirst({ orderBy: { sortOrder: 'asc' } });
+          if (firstBanner) {
+            await this.prisma.banner.update({ where: { id: firstBanner.id }, data: { subtitle: item.value } });
+          }
+        } else if (item.key === 'hero_image' || item.key === 'home_banner') {
+          const firstBanner = await this.prisma.banner.findFirst({ orderBy: { sortOrder: 'asc' } });
+          if (firstBanner) {
+            await this.prisma.banner.update({ where: { id: firstBanner.id }, data: { image: item.value } });
+          }
+        }
+      } catch (syncErr) {
+        console.warn('Could not sync hero setting with banner table:', syncErr);
+      }
     }
     return { success: true, message: 'Settings saved successfully', count: updatedList.length };
   }
