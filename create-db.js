@@ -1,7 +1,7 @@
 const https = require('https');
 
-const API_KEY = 'rnd_TiLjqLdPwUgQy54eGxE3AKJUHUla';
-const OWNER_ID = 'tea-dap6flgae00c7398gg5g';
+const API_KEY = process.env.RENDER_API_KEY || '';
+const OWNER_ID = process.env.RENDER_OWNER_ID || 'tea-dap6flgae00c7398gg5g';
 
 function renderApi(path, method = 'GET', body = null) {
   return new Promise((resolve, reject) => {

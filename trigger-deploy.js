@@ -1,6 +1,6 @@
 const https = require('https');
 
-const API_KEY = 'rnd_TiLjqLdPwUgQy54eGxE3AKJUHUla';
+const API_KEY = process.env.RENDER_API_KEY || '';
 const services = [
   { id: 'srv-dar7jao473hc73a501qg', name: 'Backend Web Service' },
   { id: 'srv-dar7jbff3r2c73beh0h0', name: 'Admin Panel' },

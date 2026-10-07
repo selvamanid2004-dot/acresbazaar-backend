@@ -627,13 +627,21 @@ export class PropertiesService {
       throw new NotFoundException('Property not found');
     }
 
-    // If user is provided and is not admin/super_admin, enforce ownership
-    if (user && user.role !== 'SUPER_ADMIN' && user.role !== 'ADMIN' && user.type !== 'admin') {
+    if (!user) {
+      throw new ForbiddenException('Authentication required to modify property');
+    }
+
+    const isAdmin = user.role === 'SUPER_ADMIN' || user.role === 'ADMIN' || user.type === 'admin';
+    if (!isAdmin) {
       const isOwner = property.sellerId === user.sub || 
                       property.sellerId === user.id || 
                       (user.email && property.sellerEmail?.toLowerCase() === user.email.toLowerCase());
       if (!isOwner) {
         throw new ForbiddenException('Access denied. You do not have permission to modify this property.');
+      }
+      // Non-admins cannot alter moderation status directly
+      if (data.status && data.status.toUpperCase() !== property.status) {
+        delete data.status;
       }
     }
 
@@ -692,7 +700,12 @@ export class PropertiesService {
     const property = await this.prisma.property.findUnique({ where: { id: propertyId } });
     if (!property) throw new NotFoundException('Property not found');
 
-    if (user && user.role !== 'SUPER_ADMIN' && user.role !== 'ADMIN' && user.type !== 'admin') {
+    if (!user) {
+      throw new ForbiddenException('Authentication required');
+    }
+
+    const isAdmin = user.role === 'SUPER_ADMIN' || user.role === 'ADMIN' || user.type === 'admin';
+    if (!isAdmin) {
       const isOwner = property.sellerId === user.sub || property.sellerId === user.id || (user.email && property.sellerEmail?.toLowerCase() === user.email.toLowerCase());
       if (!isOwner) throw new ForbiddenException('Access denied');
     }
@@ -717,7 +730,12 @@ export class PropertiesService {
     const property = await this.prisma.property.findUnique({ where: { id: propertyId } });
     if (!property) throw new NotFoundException('Property not found');
 
-    if (user && user.role !== 'SUPER_ADMIN' && user.role !== 'ADMIN' && user.type !== 'admin') {
+    if (!user) {
+      throw new ForbiddenException('Authentication required');
+    }
+
+    const isAdmin = user.role === 'SUPER_ADMIN' || user.role === 'ADMIN' || user.type === 'admin';
+    if (!isAdmin) {
       const isOwner = property.sellerId === user.sub || property.sellerId === user.id || (user.email && property.sellerEmail?.toLowerCase() === user.email.toLowerCase());
       if (!isOwner) throw new ForbiddenException('Access denied');
     }
@@ -748,7 +766,12 @@ export class PropertiesService {
     const property = await this.prisma.property.findUnique({ where: { id: propertyId } });
     if (!property) throw new NotFoundException('Property not found');
 
-    if (user && user.role !== 'SUPER_ADMIN' && user.role !== 'ADMIN' && user.type !== 'admin') {
+    if (!user) {
+      throw new ForbiddenException('Authentication required');
+    }
+
+    const isAdmin = user.role === 'SUPER_ADMIN' || user.role === 'ADMIN' || user.type === 'admin';
+    if (!isAdmin) {
       const isOwner = property.sellerId === user.sub || property.sellerId === user.id || (user.email && property.sellerEmail?.toLowerCase() === user.email.toLowerCase());
       if (!isOwner) throw new ForbiddenException('Access denied');
     }
@@ -786,8 +809,12 @@ export class PropertiesService {
       throw new NotFoundException('Property not found');
     }
 
-    // If user is provided and is not admin/super_admin, enforce ownership
-    if (user && user.role !== 'SUPER_ADMIN' && user.role !== 'ADMIN' && user.type !== 'admin') {
+    if (!user) {
+      throw new ForbiddenException('Authentication required to delete property');
+    }
+
+    const isAdmin = user.role === 'SUPER_ADMIN' || user.role === 'ADMIN' || user.type === 'admin';
+    if (!isAdmin) {
       const isOwner = property.sellerId === user.sub || 
                       property.sellerId === user.id || 
                       (user.email && property.sellerEmail?.toLowerCase() === user.email.toLowerCase());

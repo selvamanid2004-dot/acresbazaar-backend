@@ -150,8 +150,14 @@ export class PropertiesController {
   }
 
   // Create property (Seller, Dealer, or Admin quick-post)
+  @UseGuards(JwtAuthGuard)
   @Post()
   async create(@Body() body: any, @Request() req: any) {
+    if (req.user && !body.sellerId && req.user.type !== 'admin') {
+      body.sellerId = req.user.sub || req.user.id;
+      if (!body.sellerEmail && req.user.email) body.sellerEmail = req.user.email;
+      if (!body.sellerName && req.user.name) body.sellerName = req.user.name;
+    }
     return this.propertiesService.create(body);
   }
 
@@ -180,10 +186,10 @@ export class PropertiesController {
         }
       } else if (cleanStatus === 'REJECTED' || cleanStatus === 'HOLD') {
         const canReject = userPerms.includes('properties') || 
-                          userPerms.includes('properties.reject') || 
-                          userPerms.includes('gold_properties.reject') || 
-                          userPerms.includes('premium_properties.reject') || 
-                          userPerms.includes('snap_properties.reject');
+                           userPerms.includes('properties.reject') || 
+                           userPerms.includes('gold_properties.reject') || 
+                           userPerms.includes('premium_properties.reject') || 
+                           userPerms.includes('snap_properties.reject');
         if (!canReject) {
           throw new ForbiddenException('Permission Denied: You do not have permission to reject or hold properties (properties.reject)');
         }
@@ -195,6 +201,7 @@ export class PropertiesController {
   }
 
   // Edit property details (Seller/Dealer can edit their own, Admin can edit any)
+  @UseGuards(JwtAuthGuard)
   @Patch(':id')
   async update(@Param('id') id: string, @Body() body: any, @Request() req: any) {
     if (req.user && req.user.type === 'admin' && req.user.role !== 'SUPER_ADMIN') {
@@ -208,6 +215,7 @@ export class PropertiesController {
   }
 
   // Set cover / primary image for a property
+  @UseGuards(JwtAuthGuard)
   @Patch(':id/images/:imageId/cover')
   async setCoverImage(
     @Param('id') id: string,
@@ -225,6 +233,7 @@ export class PropertiesController {
   }
 
   // Delete an individual image from a property
+  @UseGuards(JwtAuthGuard)
   @Delete(':id/images/:imageId')
   async deleteImage(
     @Param('id') id: string,
@@ -242,6 +251,7 @@ export class PropertiesController {
   }
 
   // Add more images to a property
+  @UseGuards(JwtAuthGuard)
   @Post(':id/images')
   async addImages(
     @Param('id') id: string,
@@ -259,6 +269,7 @@ export class PropertiesController {
   }
 
   // Delete property (Seller/Dealer can delete their own, Admin can delete any)
+  @UseGuards(JwtAuthGuard)
   @Delete(':id')
   async delete(@Param('id') id: string, @Request() req: any) {
     if (req.user && req.user.type === 'admin' && req.user.role !== 'SUPER_ADMIN') {

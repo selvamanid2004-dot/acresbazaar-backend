@@ -23,15 +23,22 @@ function run(cmd) {
 console.log('2. Generating Prisma Client for PostgreSQL...');
 run('npx prisma generate');
 
-// 3. Push schema to Cloud database
-if (process.env.DATABASE_URL) {
-  console.log('3. Syncing database schema with Cloud DB...');
+// 3. Push schema to Cloud database safely if configured
+if (process.env.DATABASE_URL && process.env.AUTO_SYNC_SCHEMA === 'true') {
+  console.log('3. Syncing database schema with Cloud DB (safe mode)...');
   try {
-    run('npx prisma db push --accept-data-loss');
-    console.log('4. Seeding full property, customer, booking, and website dataset...');
+    run('npx prisma db push');
+  } catch (err) {
+    console.warn('Notice: Prisma db push encountered warning/skip:', err.message);
+  }
+}
+
+if (process.env.RUN_SEED === 'true') {
+  console.log('4. Running initial database seed (RUN_SEED=true)...');
+  try {
     run('npx ts-node prisma/seed.ts');
   } catch (err) {
-    console.warn('Warning during DB sync/seed:', err.message);
+    console.warn('Notice: Seed step:', err.message);
   }
 }
 

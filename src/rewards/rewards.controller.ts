@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Patch, Delete, Param, Query, Body, UseGuards, Request, ForbiddenException } from '@nestjs/common';
 import { RewardsService } from './rewards.service';
-import { AdminGuard } from '../auth/jwt-auth.guard';
+import { AdminGuard, JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../common/permissions/permissions.guard';
 import { RequirePermissions } from '../common/permissions/permissions.decorator';
 
@@ -19,45 +19,73 @@ export class RewardsController {
   }
 
   // 2. Partner Wallet: Available points, reserved points, total earned, total redeemed, ledger & claims history
+  @UseGuards(JwtAuthGuard)
   @Get('partner-wallet')
   async getPartnerWallet(
     @Query('email') email: string,
-    @Query('role') role?: string
+    @Query('role') role: string | undefined,
+    @Request() req: any
   ) {
-    return this.rewardsService.getPartnerWallet(email, role);
+    const isAdmin = req.user?.role === 'SUPER_ADMIN' || req.user?.role === 'ADMIN' || req.user?.type === 'admin';
+    const targetEmail = isAdmin && email ? email : (req.user?.email || email);
+    return this.rewardsService.getPartnerWallet(targetEmail, role);
   }
 
   // 3. Save / Update Partner Bank Details
+  @UseGuards(JwtAuthGuard)
   @Post('bank-detail')
-  async saveBankDetail(@Body() body: any) {
+  async saveBankDetail(@Body() body: any, @Request() req: any) {
+    const isAdmin = req.user?.role === 'SUPER_ADMIN' || req.user?.role === 'ADMIN' || req.user?.type === 'admin';
+    if (!isAdmin && req.user?.email) {
+      body.email = req.user.email;
+    }
     return this.rewardsService.saveBankDetail(body);
   }
 
   // 4. Partner Submit Reward Claim (500 pts OR All Points)
+  @UseGuards(JwtAuthGuard)
   @Post('claim-reward')
-  async claimReward(@Body() body: any) {
+  async claimReward(@Body() body: any, @Request() req: any) {
+    const isAdmin = req.user?.role === 'SUPER_ADMIN' || req.user?.role === 'ADMIN' || req.user?.type === 'admin';
+    if (!isAdmin && req.user?.email) {
+      body.email = req.user.email;
+    }
     return this.rewardsService.claimReward(body);
   }
 
   // Legacy Endpoints (Maintained for backward compatibility)
+  @UseGuards(JwtAuthGuard)
   @Post('claim')
-  async submitClaim(@Body() body: any) {
+  async submitClaim(@Body() body: any, @Request() req: any) {
+    const isAdmin = req.user?.role === 'SUPER_ADMIN' || req.user?.role === 'ADMIN' || req.user?.type === 'admin';
+    if (!isAdmin && req.user?.email) {
+      body.userEmail = req.user.email;
+    }
     return this.rewardsService.submitClaim(body);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('my-claim')
-  async getMyClaim(@Query('email') email: string) {
-    return this.rewardsService.getClaimByUser(email);
+  async getMyClaim(@Query('email') email: string, @Request() req: any) {
+    const isAdmin = req.user?.role === 'SUPER_ADMIN' || req.user?.role === 'ADMIN' || req.user?.type === 'admin';
+    const targetEmail = isAdmin && email ? email : (req.user?.email || email);
+    return this.rewardsService.getClaimByUser(targetEmail);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('dealer-summary')
-  async getDealerSummary(@Query('email') email: string) {
-    return this.rewardsService.getDealerRewardsSummary(email);
+  async getDealerSummary(@Query('email') email: string, @Request() req: any) {
+    const isAdmin = req.user?.role === 'SUPER_ADMIN' || req.user?.role === 'ADMIN' || req.user?.type === 'admin';
+    const targetEmail = isAdmin && email ? email : (req.user?.email || email);
+    return this.rewardsService.getDealerRewardsSummary(targetEmail);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('spotter-summary')
-  async getSpotterSummary(@Query('email') email: string) {
-    return this.rewardsService.getSpotterRewardsSummary(email);
+  async getSpotterSummary(@Query('email') email: string, @Request() req: any) {
+    const isAdmin = req.user?.role === 'SUPER_ADMIN' || req.user?.role === 'ADMIN' || req.user?.type === 'admin';
+    const targetEmail = isAdmin && email ? email : (req.user?.email || email);
+    return this.rewardsService.getSpotterRewardsSummary(targetEmail);
   }
 
   // =========================================================================

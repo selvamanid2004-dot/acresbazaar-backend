@@ -1,6 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
+function sanitizeAccount(acc: any) {
+  if (!acc) return acc;
+  const { passwordHash, ...safe } = acc;
+  return safe;
+}
+
 @Injectable()
 export class CustomersService {
   constructor(private prisma: PrismaService) {}
@@ -69,7 +75,7 @@ export class CustomersService {
       }
     });
 
-    return { success: true, count: customers.length, customers };
+    return { success: true, count: customers.length, customers: customers.map(sanitizeAccount) };
   }
 
   async findOne(id: string) {
@@ -82,7 +88,7 @@ export class CustomersService {
       }
     });
     if (customer) {
-      return { success: true, customer };
+      return { success: true, customer: sanitizeAccount(customer) };
     }
 
     // Check admin table
@@ -120,7 +126,7 @@ export class CustomersService {
           ...(typeof data.isActive === 'boolean' ? { isActive: data.isActive } : {})
         }
       });
-      return { success: true, message: 'User updated successfully', customer: updated };
+      return { success: true, message: 'User updated successfully', customer: sanitizeAccount(updated) };
     }
 
     const existingAdmin = await this.prisma.admin.findUnique({ where: { id } });
@@ -132,7 +138,7 @@ export class CustomersService {
           ...(data.role ? { role: data.role.toUpperCase() } : {})
         }
       });
-      return { success: true, message: 'Admin profile updated successfully', customer: updated };
+      return { success: true, message: 'Admin profile updated successfully', customer: sanitizeAccount(updated) };
     }
 
     throw new NotFoundException('User or Administrator not found');
@@ -143,7 +149,7 @@ export class CustomersService {
     if (!existing) {
       const existingAdmin = await this.prisma.admin.findUnique({ where: { id } });
       if (existingAdmin) {
-        return { success: true, message: 'Admin accounts remain permanently active', customer: existingAdmin };
+        return { success: true, message: 'Admin accounts remain permanently active', customer: sanitizeAccount(existingAdmin) };
       }
       throw new NotFoundException('User not found');
     }
@@ -160,7 +166,7 @@ export class CustomersService {
     return {
       success: true,
       message: `User ${updated.isActive ? 'activated' : 'deactivated'} successfully`,
-      customer: updated
+      customer: sanitizeAccount(updated)
     };
   }
 

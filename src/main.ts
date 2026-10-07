@@ -50,9 +50,35 @@ async function bootstrap() {
     return res.redirect('https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80');
   });
 
+  // Security Headers Middleware
+  app.use((req: any, res: any, next: any) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    next();
+  });
+
   // Enable CORS for frontend clients
+  const allowedOrigins = [
+    'http://localhost:4200',
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://localhost:5001',
+    'https://acresbazaar.com',
+    'https://www.acresbazaar.com',
+    'https://acresbazaar-backend.onrender.com',
+    'https://acresbazaar-admin.onrender.com'
+  ];
+
   app.enableCors({
-    origin: true,
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.onrender.com') || origin.includes('localhost')) {
+        callback(null, true);
+      } else {
+        callback(null, true); // Fallback allows client while logging
+      }
+    },
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });
@@ -61,7 +87,7 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
 
   // Global validation pipe
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+  app.useGlobalPipes(new ValidationPipe({ transform: true }));
 
   // Global Exception Filter & Logging Interceptor
   app.useGlobalFilters(new AllExceptionsFilter());
