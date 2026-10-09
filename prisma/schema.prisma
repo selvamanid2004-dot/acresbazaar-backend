@@ -1,5 +1,5 @@
 datasource db {
-  provider = "sqlite"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
@@ -14,7 +14,7 @@ model Admin {
   name         String
   role         String   @default("SUPER_ADMIN") // "SUPER_ADMIN", "ADMIN", "STAFF"
   isActive     Boolean  @default(true)
-  permissions  String?  // JSON string array of permission codes
+  permissions  String?  @db.Text // JSON string array of permission codes
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
@@ -40,8 +40,8 @@ model Category {
   id           String   @id @default(uuid())
   name         String
   slug         String   @unique
-  description  String?
-  imageUrl     String?
+  description  String?  @db.Text
+  imageUrl     String?  @db.Text
   isActive     Boolean  @default(true)
   displayOrder Int      @default(0)
   createdAt    DateTime @default(now())
@@ -54,8 +54,8 @@ model Category {
 model Banner {
   id         String   @id @default(uuid())
   title      String
-  subtitle   String?
-  image      String   // Image URL or file path
+  subtitle   String?  @db.Text
+  image      String   @db.Text // Image URL or file path
   buttonText String?  @default("Explore Now")
   buttonUrl  String?  @default("/properties")
   status     String   @default("ACTIVE") // "ACTIVE", "INACTIVE"
@@ -72,7 +72,7 @@ model Property {
   id            String          @id @default(uuid())
   title         String
   category      String
-  description   String?
+  description   String?         @db.Text
   location      String
   city          String?
   price         Float
@@ -85,7 +85,7 @@ model Property {
   sellerEmail   String?
   sellerRole    String?         @default("SELLER") // "SELLER", "DEALER", "COMMON_PEOPLE"
   dealerCompany String?
-  categorySpecs String?         // JSON serialized specs
+  categorySpecs String?         @db.Text // JSON serialized specs
   pointsAwarded Boolean         @default(false)
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
@@ -123,7 +123,7 @@ model PropertyBooking {
   sellerPhone      String?
   bookingAmount    Float?    @default(0)
   bookingStatus    String    @default("CONFIRMED") // "PENDING", "CONFIRMED", "COMPLETED", "CANCELLED"
-  notes            String?
+  notes            String?   @db.Text
   bookingDate      DateTime  @default(now())
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
@@ -138,7 +138,7 @@ model PropertyBooking {
 model PropertyImage {
   id           String   @id @default(uuid())
   propertyId   String
-  imageUrl     String
+  imageUrl     String   @db.Text
   isPrimary    Boolean  @default(false)
   displayOrder Int      @default(0)
   property     Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
@@ -151,11 +151,11 @@ model Plan {
   planId      String   @unique // "gold", "platinum"
   name        String
   price       Float
-  description String?
-  benefits    String?  // JSON array
-  features    String?  // JSON array
+  description String?  @db.Text
+  benefits    String?  @db.Text // JSON array
+  features    String?  @db.Text // JSON array
   isActive    Boolean  @default(true)
-  content     String?
+  content     String?  @db.Text
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
@@ -169,7 +169,7 @@ model Reward {
   rewardTitle   String
   points        Int      @default(0)
   amount        Float    @default(0)
-  reason        String?
+  reason        String?  @db.Text
   status        String   @default("PENDING") // "PENDING", "APPROVED", "PAID", "REJECTED"
   date          DateTime @default(now())
   createdAt     DateTime @default(now())
@@ -183,8 +183,8 @@ model Report {
   userName      String?
   userEmail     String?
   userPhone     String?
-  reason        String
-  description   String
+  reason        String   @db.Text
+  description   String   @db.Text
   status        String   @default("PENDING") // "PENDING", "RESOLVED", "REJECTED"
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -205,7 +205,7 @@ model VerifiedPartner {
 model WebsiteSetting {
   id        String   @id @default(uuid())
   key       String   @unique
-  value     String
+  value     String   @db.Text
   group     String   // "home", "about", "service", "logo", "contact"
   updatedAt DateTime @updatedAt
 }
@@ -214,17 +214,17 @@ model Chat {
   id             String   @id @default(uuid())
   userName       String
   userEmail      String?
-  userAvatar     String?
-  previewMessage String
+  userAvatar     String?  @db.Text
+  previewMessage String   @db.Text
   isRead         Boolean  @default(false)
   lastMessageAt  DateTime @default(now())
-  messages       String?  // JSON array of message objects
+  messages       String?  @db.Text // JSON array of message objects
 }
 
 model CalendarEvent {
   id          String   @id @default(uuid())
   title       String
-  description String?
+  description String?  @db.Text
   eventDate   DateTime
   eventType   String   @default("REMINDER") // "INSPECTION", "MEETING", "REMINDER", "DEADLINE"
   isCompleted Boolean  @default(false)
@@ -237,7 +237,7 @@ model UserActivity {
   userRole    String?  @default("BUYER") // "BUYER", "SELLER", "DEALER", "ANONYMOUS"
   actionType  String   // "VIEW_PROPERTY", "SEARCH", "FILTER", "SAVE_WISHLIST", "CONTACT_SELLER", "SUBMIT_PROPERTY"
   entityId    String?  // e.g. propertyId
-  details     String?  // JSON serialized context or search query
+  details     String?  @db.Text // JSON serialized context or search query
   ipAddress   String?
   createdAt   DateTime @default(now())
   user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -277,7 +277,7 @@ model PointsLedger {
   points          Int            // e.g. +20, -500, +500
   balanceBefore   Int
   balanceAfter    Int
-  description     String
+  description     String         @db.Text
   adminId         String?
   adminName       String?
   createdAt       DateTime       @default(now())
@@ -323,8 +323,8 @@ model RewardClaim {
   upiId                String?
   mobileNumber         String?
   status               String         @default("PENDING") // "PENDING", "APPROVED", "PROCESSING", "PAID", "REJECTED"
-  adminNotes           String?
-  rejectionReason      String?
+  adminNotes           String?        @db.Text
+  rejectionReason      String?        @db.Text
   paymentReference     String?        // Transaction reference / UTR ID
   paymentDate          DateTime?
   processedByAdminId   String?
@@ -346,4 +346,3 @@ model RewardSetting {
   updatedBy         String?
   updatedAt         DateTime @updatedAt
 }
-
