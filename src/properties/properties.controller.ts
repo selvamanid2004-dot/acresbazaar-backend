@@ -28,8 +28,10 @@ export class PropertiesController {
     @Query('constructionStatus') constructionStatus?: string,
     @Query('planType') planType?: string,
     @Query('search') search?: string,
-    @Query('isSnap') isSnap?: string
+    @Query('isSnap') isSnap?: string,
+    @Request() req?: any
   ) {
+    const authHeader = req?.headers?.authorization;
     return this.propertiesService.findPublic({ 
       category, 
       location: location || city, 
@@ -44,7 +46,7 @@ export class PropertiesController {
       planType, 
       search, 
       isSnap 
-    });
+    }, authHeader);
   }
 
   // Public endpoint for dynamic location/city autocomplete suggestions from live database properties
@@ -149,8 +151,9 @@ export class PropertiesController {
 
   // Get single property details
   @Get(':id')
-  async findOne(@Param('id') id: string) {
-    return this.propertiesService.findOne(id);
+  async findOne(@Param('id') id: string, @Request() req?: any) {
+    const authHeader = req?.headers?.authorization;
+    return this.propertiesService.findOne(id, authHeader);
   }
 
   // Create property (Seller, Dealer, or Admin quick-post)

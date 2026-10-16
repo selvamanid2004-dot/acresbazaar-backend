@@ -145,6 +145,26 @@ export function extractPropertyDetailsVisible(p: any): boolean {
   return true; // Default ON (visible according to normal website display rules)
 }
 
+export function extractRequester(authHeader?: string): { isAdmin: boolean; hasPlan: boolean; userId?: string; email?: string } {
+  if (!authHeader || typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) {
+    return { isAdmin: false, hasPlan: false };
+  }
+  const token = authHeader.substring(7).trim();
+  if (!token) return { isAdmin: false, hasPlan: false };
+  try {
+    const jwt = require('jsonwebtoken');
+    const secret = process.env.JWT_SECRET || 'aura_estate_jwt_secret_super_secure_key_2026';
+    const decoded: any = jwt.verify(token, secret);
+    if (!decoded) return { isAdmin: false, hasPlan: false };
+    const isAdmin = decoded.type === 'admin' || decoded.role === 'ADMIN' || decoded.role === 'SUPER_ADMIN';
+    const plan = (decoded.membershipPlan || decoded.planType || '').toUpperCase();
+    const hasPlan = plan === 'GOLD' || plan === 'PLATINUM';
+    return { isAdmin, hasPlan, userId: decoded.sub || decoded.id, email: decoded.email };
+  } catch {
+    return { isAdmin: false, hasPlan: false };
+  }
+}
+
 
 function parseBudgetRange(budget?: string): { min?: number; max?: number } {
   if (!budget || budget === 'any' || budget === 'ALL') return {};
@@ -357,7 +377,7 @@ export class PropertiesService {
   }
 
   // 2. Find Single Property
-  async findOne(id: string) {
+  async findOne(id: string, authHeader?: string) {
     const property = await this.prisma.property.findUnique({
       where: { id },
       include: {
@@ -369,8 +389,23 @@ export class PropertiesService {
     if (!property) {
       throw new NotFoundException('Property not found');
     }
-    const vids = extractPropertyVideos(property);
+
+    const requester = extractRequester(authHeader);
     const isVisible = extractPropertyDetailsVisible(property);
+    
+    // Check if requester has booked/purchased access for this property
+    let isBookedByRequester = false;
+    if (requester.userId && property.bookings && property.bookings.length > 0) {
+      isBookedByRequester = property.bookings.some((b: any) => 
+        b.bookerId === requester.userId || (b.bookerEmail && requester.email && b.bookerEmail.toLowerCase() === requester.email.toLowerCase())
+      );
+    }
+
+    // ON (Visible) -> Unlocked for EVERYONE without paying or selecting a plan (Rule 3)
+    // OFF (Locked) -> Unlocked ONLY if Admin, user has paid plan, or has confirmed booking (Rule 4 & 7)
+    const isUnlocked = isVisible || requester.isAdmin || requester.hasPlan || isBookedByRequester;
+
+    const vids = extractPropertyVideos(property);
     let imgs = (property.images || []).map(img => ({
       ...img,
       imageUrl: saveBase64Image(img.imageUrl, property.category),
@@ -386,13 +421,39 @@ export class PropertiesService {
         mediaType: 'IMAGE'
       } as any];
     }
-    const owner_contact = extractOwnerContact(property);
+
+    const rawContact = extractOwnerContact(property);
+    const owner_contact = isUnlocked ? rawContact : {
+      name: property.sellerName || 'Verified Partner',
+      phone: 'Plan Required to View',
+      email: 'Plan Required to View'
+    };
+
+    let specsObj: any = {};
+    try {
+      specsObj = typeof property.categorySpecs === 'string' ? JSON.parse(property.categorySpecs) : (property.categorySpecs || {});
+    } catch {}
+
+    if (!isUnlocked) {
+      delete specsObj.ownerPhone;
+      delete specsObj.ownerEmail;
+      delete specsObj.boardContact;
+      delete specsObj.exactAddress;
+      delete specsObj.surveyNumber;
+      delete specsObj.documentUrl;
+    }
+
     return { 
       success: true, 
       property: { 
         ...property, 
+        sellerPhone: isUnlocked ? property.sellerPhone : 'Locked • Plan Required',
+        sellerEmail: isUnlocked ? property.sellerEmail : 'Locked • Plan Required',
+        address: isUnlocked ? ((property as any).address || property.location || '') : (property.location || property.city || ''),
+        categorySpecs: JSON.stringify(specsObj),
+        specs: specsObj,
         detailsVisible: isVisible,
-        isDetailsLocked: !isVisible,
+        isDetailsLocked: !isUnlocked,
         images: imgs,
         videos: vids,
         videoCount: vids.length,
@@ -1175,7 +1236,7 @@ export class PropertiesService {
     planType?: string; 
     search?: string; 
     isSnap?: string;
-  }) {
+  }, authHeader?: string) {
     const { category, location, budget, minPrice, maxPrice, propertyType, bhk, facing, furnishing, constructionStatus, planType, search, isSnap } = query;
     const where: any = {
       status: 'APPROVED' // Only approved properties published on Public Website
@@ -1349,6 +1410,8 @@ export class PropertiesService {
       }
     });
 
+    const requester = extractRequester(authHeader);
+
     return {
       success: true,
       count: properties.length,
@@ -1360,6 +1423,11 @@ export class PropertiesService {
 
         const planNormalized = (p.planType || 'PLATINUM').toUpperCase();
         const tier = planNormalized === 'GOLD' ? 'gold' : 'platinum';
+
+        const isVisible = extractPropertyDetailsVisible(p);
+        // ON (Visible) -> Unlocked for EVERYONE without paying or selecting a plan (Rule 3)
+        // OFF (Locked) -> Unlocked ONLY if Admin or user has paid plan (Rule 4 & 7)
+        const isUnlocked = isVisible || requester.isAdmin || requester.hasPlan;
 
         const rawImages = (p.images || []).map((img, idx) => ({
           id: img.id,
@@ -1387,6 +1455,22 @@ export class PropertiesService {
         ];
 
         const vids = extractPropertyVideos(p);
+        const rawContact = extractOwnerContact(p);
+        const owner_contact = isUnlocked ? rawContact : {
+          name: p.sellerName || 'Verified Partner',
+          phone: 'Plan Required to View',
+          email: 'Plan Required to View'
+        };
+
+        if (!isUnlocked) {
+          delete specs.ownerPhone;
+          delete specs.ownerEmail;
+          delete specs.boardContact;
+          delete specs.exactAddress;
+          delete specs.surveyNumber;
+          delete specs.documentUrl;
+        }
+
         return {
           id: p.id,
           title: p.title,
@@ -1399,6 +1483,8 @@ export class PropertiesService {
           location: p.location,
           city: p.city,
           description: p.description,
+          address: isUnlocked ? ((p as any).address || p.location || '') : (p.location || p.city || ''),
+          exactAddress: isUnlocked ? ((p as any).address || p.location || '') : (p.location || p.city || ''),
           imageUrl: mainImage,
           coverImage: mainImage,
           galleryImages: galleryImages,
@@ -1409,13 +1495,14 @@ export class PropertiesService {
           totalImages: galleryImages.length,
           imageCount: galleryImages.length,
           specs,
-          detailsVisible: extractPropertyDetailsVisible(p),
-          isDetailsLocked: !extractPropertyDetailsVisible(p),
-          owner_contact: extractOwnerContact(p),
-          ownerContact: extractOwnerContact(p),
-          sellerName: extractOwnerContact(p).name,
-          sellerPhone: extractOwnerContact(p).phone,
-          sellerEmail: extractOwnerContact(p).email,
+          detailsVisible: isVisible,
+          isDetailsLocked: !isUnlocked,
+          owner_contact,
+          ownerContact: owner_contact,
+          sellerName: owner_contact.name,
+          sellerPhone: owner_contact.phone,
+          sellerEmail: owner_contact.email,
+          contactPhone: owner_contact.phone,
           status: p.status,
           createdAt: p.createdAt
         };
