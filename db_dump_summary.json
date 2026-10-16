@@ -1,0 +1,665 @@
+{
+  "Admin": {
+    "count": 2,
+    "rows": [
+      {
+        "id": "admin-staff-2",
+        "email": "staff@acresbazaar.com",
+        "passwordHash": "$2b$10$/Nig0adRC/T/6Y5QIA0DguFoJiX9gAG7dD4XGum7vG5se4Htb.xri",
+        "name": "Operations Staff",
+        "role": "ADMIN",
+        "isActive": true,
+        "permissions": "[\"properties\",\"bookings\",\"rewards\",\"categories\"]",
+        "createdAt": "2026-10-09T08:05:53.053Z",
+        "updatedAt": "2026-10-09T08:05:53.053Z"
+      },
+      {
+        "id": "admin-super-1",
+        "email": "admin@acresbazaar.com",
+        "passwordHash": "$2b$10$/Nig0adRC/T/6Y5QIA0DguFoJiX9gAG7dD4XGum7vG5se4Htb.xri",
+        "name": "Executive Administrator",
+        "role": "SUPER_ADMIN",
+        "isActive": true,
+        "permissions": "[\"all\"]",
+        "createdAt": "2026-10-09T08:05:52.723Z",
+        "updatedAt": "2026-10-09T08:05:52.723Z"
+      }
+    ]
+  },
+  "User": {
+    "count": 5,
+    "rows": [
+      {
+        "id": "usr-buyer-1",
+        "name": "Rajesh Kumar",
+        "mobile": "9840111223",
+        "email": "buyer@acresbazaar.com",
+        "passwordHash": "$2b$10$URpfM1TvDPwcYat.s88BuuZa17OIC.Gk3gJpcPAbYPPxqgpUj2Yqy",
+        "role": "BUYER",
+        "isActive": true,
+        "createdAt": "2026-10-09T08:05:53.331Z",
+        "updatedAt": "2026-10-09T08:05:53.331Z"
+      },
+      {
+        "id": "usr-dealer-3",
+        "name": "Vikram Sharma (Horizon Realty)",
+        "mobile": "9741044556",
+        "email": "dealer@acresbazaar.com",
+        "passwordHash": "$2b$10$URpfM1TvDPwcYat.s88BuuZa17OIC.Gk3gJpcPAbYPPxqgpUj2Yqy",
+        "role": "DEALER",
+        "isActive": true,
+        "createdAt": "2026-10-09T08:05:55.399Z",
+        "updatedAt": "2026-10-09T08:05:55.399Z"
+      },
+      {
+        "id": "usr-investor-5",
+        "name": "Priya Sundaram (VIP Investor)",
+        "mobile": "9884055667",
+        "email": "investor@acresbazaar.com",
+        "passwordHash": "$2b$10$URpfM1TvDPwcYat.s88BuuZa17OIC.Gk3gJpcPAbYPPxqgpUj2Yqy",
+        "role": "BUYER",
+        "isActive": true,
+        "createdAt": "2026-10-09T08:05:56.084Z",
+        "updatedAt": "2026-10-09T08:05:56.084Z"
+      },
+      {
+        "id": "usr-partner-4",
+        "name": "Ramesh Spotter Partner",
+        "mobile": "9840122334",
+        "email": "partner@acresbazaar.com",
+        "passwordHash": "$2b$10$URpfM1TvDPwcYat.s88BuuZa17OIC.Gk3gJpcPAbYPPxqgpUj2Yqy",
+        "role": "COMMON_PEOPLE",
+        "isActive": true,
+        "createdAt": "2026-10-09T08:05:55.634Z",
+        "updatedAt": "2026-10-09T08:05:55.634Z"
+      },
+      {
+        "id": "usr-seller-2",
+        "name": "Sunita Reddy",
+        "mobile": "9900188990",
+        "email": "seller@acresbazaar.com",
+        "passwordHash": "$2b$10$URpfM1TvDPwcYat.s88BuuZa17OIC.Gk3gJpcPAbYPPxqgpUj2Yqy",
+        "role": "SELLER",
+        "isActive": true,
+        "createdAt": "2026-10-09T08:05:54.593Z",
+        "updatedAt": "2026-10-09T08:05:54.593Z"
+      }
+    ]
+  },
+  "Category": {
+    "count": 7,
+    "rows": [
+      {
+        "id": "cat-1",
+        "name": "Plots & Land",
+        "slug": "plots",
+        "description": "Verified residential, commercial & industrial land plots",
+        "imageUrl": "https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=400",
+        "isActive": true,
+        "displayOrder": 1,
+        "createdAt": "2026-10-09T08:05:56.299Z",
+        "updatedAt": "2026-10-09T08:05:56.299Z"
+      },
+      {
+        "id": "cat-2",
+        "name": "Villas",
+        "slug": "villas",
+        "description": "Exclusive luxury gated community & independent villas",
+        "imageUrl": "https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=400",
+        "isActive": true,
+        "displayOrder": 2,
+        "createdAt": "2026-10-09T08:05:56.641Z",
+        "updatedAt": "2026-10-09T08:05:56.641Z"
+      },
+      {
+        "id": "cat-3",
+        "name": "Apartments / Flats",
+        "slug": "apartments",
+        "description": "Multi-storey premium apartments & high-rise residences",
+        "imageUrl": "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=400",
+        "isActive": true,
+        "displayOrder": 3,
+        "createdAt": "2026-10-09T08:05:56.854Z",
+        "updatedAt": "2026-10-09T08:05:56.854Z"
+      },
+      {
+        "id": "cat-4",
+        "name": "Independent Houses",
+        "slug": "independent-houses",
+        "description": "Individual duplex, triplex homes with clear land titles",
+        "imageUrl": "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400",
+        "isActive": true,
+        "displayOrder": 4,
+        "createdAt": "2026-10-09T08:05:57.086Z",
+        "updatedAt": "2026-10-09T08:05:57.086Z"
+      },
+      {
+        "id": "cat-5",
+        "name": "Commercial Spaces",
+        "slug": "commercial",
+        "description": "Grade-A corporate office floors, retail showrooms & tech parks",
+        "imageUrl": "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=400",
+        "isActive": true,
+        "displayOrder": 5,
+        "createdAt": "2026-10-09T08:05:57.461Z",
+        "updatedAt": "2026-10-09T08:05:57.461Z"
+      },
+      {
+        "id": "cat-6",
+        "name": "Farm Lands",
+        "slug": "farm-lands",
+        "description": "Scenic managed agro farmlands & country estate parcels",
+        "imageUrl": "https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=400",
+        "isActive": true,
+        "displayOrder": 6,
+        "createdAt": "2026-10-09T08:05:57.938Z",
+        "updatedAt": "2026-10-09T08:05:57.938Z"
+      },
+      {
+        "id": "cat-7",
+        "name": "Layouts",
+        "slug": "layouts",
+        "description": "Township master developments and plotted enclave projects",
+        "imageUrl": "https://images.unsplash.com/photo-1582407947304-fd86f028f716?w=400",
+        "isActive": true,
+        "displayOrder": 7,
+        "createdAt": "2026-10-09T08:05:58.484Z",
+        "updatedAt": "2026-10-09T08:05:58.484Z"
+      }
+    ]
+  },
+  "Banner": {
+    "count": 0,
+    "rows": []
+  },
+  "Property": {
+    "count": 10,
+    "rows": [
+      {
+        "id": "prop-apt-3",
+        "title": "Skyline Zenith Heights 3 BHK Apartment",
+        "category": "Apartments / Flats",
+        "description": "Spacious 3 BHK modern skyline apartment with panoramic balcony view, premium Italian marble, EV charging bays, and rooftop infinity lounge.",
+        "location": "Indiranagar 100ft Road, Bangalore",
+        "city": "Bangalore",
+        "price": 18500000,
+        "priceDisplay": "₹1.85 Cr",
+        "status": "APPROVED",
+        "planType": "PLATINUM",
+        "sellerId": "usr-dealer-3",
+        "sellerName": "Vikram Sharma (Horizon Realty)",
+        "sellerPhone": "+91 97410 44556",
+        "sellerEmail": "dealer@acresbazaar.com",
+        "sellerRole": "DEALER",
+        "dealerCompany": "Prestige Realty Network",
+        "categorySpecs": "{\"beds\":3,\"baths\":3,\"sqft\":2150,\"bhk\":\"3 BHK\",\"floor\":\"14th Floor\",\"facing\":\"East\",\"furnishing\":\"Semi Furnished\",\"constructionStatus\":\"Ready to Move\",\"amenities\":[\"Infinity Pool\",\"Gym\",\"Covered Parking\",\"Power Backup\",\"Clubhouse\"]}",
+        "pointsAwarded": false,
+        "createdAt": "2026-10-09T08:06:02.274Z",
+        "updatedAt": "2026-10-09T08:06:02.274Z"
+      },
+      {
+        "id": "prop-comm-4",
+        "title": "Prime Tech Corporate Office Floor",
+        "category": "Commercial Spaces",
+        "description": "Grade-A corporate office floor with leasable area, 100% DG power backup, high-speed elevators, centralized HVAC, and LEED Platinum certification.",
+        "location": "Bellandur ORR, Bangalore",
+        "city": "Bangalore",
+        "price": 55000000,
+        "priceDisplay": "₹5.50 Cr",
+        "status": "APPROVED",
+        "planType": "PLATINUM",
+        "sellerId": "usr-dealer-3",
+        "sellerName": "Vikram Sharma (Horizon Realty)",
+        "sellerPhone": "+91 97410 44556",
+        "sellerEmail": "dealer@acresbazaar.com",
+        "sellerRole": "DEALER",
+        "dealerCompany": "Brigade Horizon Commercial",
+        "categorySpecs": "{\"sqft\":6500,\"commercialType\":\"Office Floor\",\"parking\":\"8 Reserved Bays\",\"furnishing\":\"Bare Shell\",\"amenities\":[\"100% Power Backup\",\"High Speed Elevators\",\"Central AC\",\"Fire Safety\"]}",
+        "pointsAwarded": false,
+        "createdAt": "2026-10-09T08:06:02.927Z",
+        "updatedAt": "2026-10-09T08:06:02.927Z"
+      },
+      {
+        "id": "prop-dealer-10",
+        "title": "Royal Palms Premium Gated Community Villa",
+        "category": "Villas",
+        "description": "Ultra-modern 3 BHK Mediterranean style villa located in high-growth IT corridor with private backyard, modular kitchen, and smart home automation.",
+        "location": "OMR Road, Chennai",
+        "city": "Chennai",
+        "price": 14500000,
+        "priceDisplay": "₹1.45 Cr",
+        "status": "APPROVED",
+        "planType": "GOLD",
+        "sellerId": "usr-dealer-3",
+        "sellerName": "Vikram Sharma (Horizon Realty)",
+        "sellerPhone": "+91 97410 44556",
+        "sellerEmail": "dealer@acresbazaar.com",
+        "sellerRole": "DEALER",
+        "dealerCompany": "Apex Properties & Builders",
+        "categorySpecs": "{\"beds\":3,\"baths\":3,\"sqft\":2800,\"bhk\":\"3 BHK\",\"facing\":\"East\",\"furnishing\":\"Semi Furnished\",\"constructionStatus\":\"Ready to Move\",\"amenities\":[\"Clubhouse\",\"Swimming Pool\",\"Gym\",\"Kids Play Area\",\"24/7 Security\"]}",
+        "pointsAwarded": false,
+        "createdAt": "2026-10-09T08:06:06.184Z",
+        "updatedAt": "2026-10-09T08:06:06.184Z"
+      },
+      {
+        "id": "prop-farm-6",
+        "title": "Whispering Palms Organic Agro Estate",
+        "category": "Farm Lands",
+        "description": "3.5-acre lush organic coconut and teak agro farm with clear patta title, drip irrigation pipeline, solar fence, and scenic country cottage.",
+        "location": "Mysore Road, Mandya",
+        "city": "Mandya",
+        "price": 16500000,
+        "priceDisplay": "₹1.65 Cr",
+        "status": "APPROVED",
+        "planType": "PLATINUM",
+        "sellerId": "usr-seller-2",
+        "sellerName": "Sunita Reddy",
+        "sellerPhone": "+91 99001 88990",
+        "sellerEmail": "seller@acresbazaar.com",
+        "sellerRole": "SELLER",
+        "dealerCompany": null,
+        "categorySpecs": "{\"acreage\":\"3.5 Acres\",\"soilType\":\"Red Loam Soil\",\"waterSource\":\"Borewell & Canal Drip\",\"titleType\":\"Clear Single Owner Patta\",\"amenities\":[\"Solar Fencing\",\"Farm House\",\"Electricity Connection\",\"Tar Road Access\"]}",
+        "pointsAwarded": false,
+        "createdAt": "2026-10-09T08:06:04.322Z",
+        "updatedAt": "2026-10-09T08:06:04.322Z"
+      },
+      {
+        "id": "prop-hold-8",
+        "title": "Lakeview Executive Residence (Under Legal Review)",
+        "category": "Villas",
+        "description": "High-profile lake-facing villa listing placed on temporary administrative hold pending updated mutation and tax clearance documents.",
+        "location": "Hebbal, Bangalore",
+        "city": "Bangalore",
+        "price": 31000000,
+        "priceDisplay": "₹3.10 Cr",
+        "status": "HOLD",
+        "planType": "PLATINUM",
+        "sellerId": "usr-dealer-3",
+        "sellerName": "Vikram Sharma (Horizon Realty)",
+        "sellerPhone": "+91 97410 44556",
+        "sellerEmail": "dealer@acresbazaar.com",
+        "sellerRole": "DEALER",
+        "dealerCompany": "Aditya Realty Consultants",
+        "categorySpecs": "{\"beds\":4,\"baths\":4,\"sqft\":3900,\"holdReason\":\"Awaiting 2026 municipal property tax clearance receipt\"}",
+        "pointsAwarded": false,
+        "createdAt": "2026-10-09T08:06:05.425Z",
+        "updatedAt": "2026-10-09T08:06:05.425Z"
+      },
+      {
+        "id": "prop-house-5",
+        "title": "Silver Oak Luxury Duplex Bungalow",
+        "category": "Independent Houses",
+        "description": "Independent 4 BHK triplex bungalow with private terrace lounge, bespoke teakwood finishings, landscaped courtyard, and private borewell.",
+        "location": "Koramangala 4th Block, Bangalore",
+        "city": "Bangalore",
+        "price": 34000000,
+        "priceDisplay": "₹3.40 Cr",
+        "status": "APPROVED",
+        "planType": "GOLD",
+        "sellerId": "usr-seller-2",
+        "sellerName": "Sunita Reddy",
+        "sellerPhone": "+91 99001 88990",
+        "sellerEmail": "seller@acresbazaar.com",
+        "sellerRole": "SELLER",
+        "dealerCompany": null,
+        "categorySpecs": "{\"beds\":4,\"baths\":5,\"sqft\":3800,\"bhk\":\"4 BHK\",\"facing\":\"North\",\"furnishing\":\"Semi Furnished\",\"constructionStatus\":\"Ready to Move\",\"amenities\":[\"Private Garden\",\"Terrace Lounge\",\"Covered Parking\",\"Solar Water\"]}",
+        "pointsAwarded": false,
+        "createdAt": "2026-10-09T08:06:03.502Z",
+        "updatedAt": "2026-10-09T08:06:03.502Z"
+      },
+      {
+        "id": "prop-plot-2",
+        "title": "Emerald Palms Gated Residential Plots",
+        "category": "Plots",
+        "description": "BDA-approved residential corner parcel in a premier gated layout with 40-ft wide blacktop roads, underground utilities, 24/7 surveillance, and landscaped parks.",
+        "location": "Sarjapur Road, Bangalore",
+        "city": "Bangalore",
+        "price": 12500000,
+        "priceDisplay": "₹1.25 Cr",
+        "status": "APPROVED",
+        "planType": "GOLD",
+        "sellerId": "usr-dealer-3",
+        "sellerName": "Vikram Sharma (Horizon Realty)",
+        "sellerPhone": "+91 97410 44556",
+        "sellerEmail": "dealer@acresbazaar.com",
+        "sellerRole": "DEALER",
+        "dealerCompany": "Horizon Realty Advisors",
+        "categorySpecs": "{\"plotSize\":\"2400 sq.ft\",\"dimensions\":\"40x60 ft\",\"facing\":\"North-East\",\"reraApproved\":true,\"boundaryWall\":true,\"amenities\":[\"Gated Community\",\"Blacktop Roads\",\"Street Lights\",\"Water Connection\"]}",
+        "pointsAwarded": false,
+        "createdAt": "2026-10-09T08:06:01.659Z",
+        "updatedAt": "2026-10-09T08:06:01.659Z"
+      },
+      {
+        "id": "prop-rejected-9",
+        "title": "Heritage Enclave Parcel (Incomplete Documentation)",
+        "category": "Plots",
+        "description": "Plot listing rejected during validation due to mismatch in layout survey numbers and non-RERA registered development scheme.",
+        "location": "Devanahalli, Bangalore",
+        "city": "Bangalore",
+        "price": 8500000,
+        "priceDisplay": "₹85 Lakhs",
+        "status": "REJECTED",
+        "planType": "GOLD",
+        "sellerId": "usr-seller-2",
+        "sellerName": "Sunita Reddy",
+        "sellerPhone": "+91 99001 88990",
+        "sellerEmail": "seller@acresbazaar.com",
+        "sellerRole": "SELLER",
+        "dealerCompany": null,
+        "categorySpecs": "{\"plotSize\":\"1500 sq.ft\",\"rejectionReason\":\"Survey number mismatch against master development plan\"}",
+        "pointsAwarded": false,
+        "createdAt": "2026-10-09T08:06:05.688Z",
+        "updatedAt": "2026-10-09T08:06:05.688Z"
+      },
+      {
+        "id": "prop-snap-pending-7",
+        "title": "Partner Spot TO-LET & Sale Villa in Anna Nagar",
+        "category": "Villas",
+        "description": "Community partner submission: Prime corner villa spotted with direct owner banner for quick sale or long-term lease. Pending admin field verification.",
+        "location": "Anna Nagar, Chennai",
+        "city": "Chennai",
+        "price": 9500000,
+        "priceDisplay": "₹95 Lakhs",
+        "status": "PENDING",
+        "planType": "PLATINUM",
+        "sellerId": "usr-partner-4",
+        "sellerName": "Ramesh Spotter Partner",
+        "sellerPhone": "+91 98401 22334",
+        "sellerEmail": "partner@acresbazaar.com",
+        "sellerRole": "COMMON_PEOPLE",
+        "dealerCompany": null,
+        "categorySpecs": "{\"isSnap\":true,\"spotterNotes\":\"Spotted on 2nd Avenue Anna Nagar with contact board\",\"sqft\":2600,\"bhk\":\"3 BHK\"}",
+        "pointsAwarded": false,
+        "createdAt": "2026-10-09T08:06:05.039Z",
+        "updatedAt": "2026-10-09T08:06:05.039Z"
+      },
+      {
+        "id": "prop-villa-1",
+        "title": "Green Meadows Luxury 4 BHK Villa",
+        "category": "Villas",
+        "description": "Bespoke 4 BHK luxury architectural villa with private infinity pool, landscaped zen gardens, double-height living spaces, and Italian marble flooring in prime Whitefield.",
+        "location": "Whitefield, Bangalore",
+        "city": "Bangalore",
+        "price": 28500000,
+        "priceDisplay": "₹2.85 Cr",
+        "status": "APPROVED",
+        "planType": "PLATINUM",
+        "sellerId": "usr-seller-2",
+        "sellerName": "Sunita Reddy",
+        "sellerPhone": "+91 99001 88990",
+        "sellerEmail": "seller@acresbazaar.com",
+        "sellerRole": "SELLER",
+        "dealerCompany": null,
+        "categorySpecs": "{\"beds\":4,\"baths\":4,\"sqft\":4200,\"bhk\":\"4 BHK\",\"facing\":\"East\",\"furnishing\":\"Fully Furnished\",\"constructionStatus\":\"Ready to Move\",\"amenities\":[\"Private Pool\",\"Clubhouse\",\"Gym\",\"EV Charging\",\"24/7 Security\"]}",
+        "pointsAwarded": false,
+        "createdAt": "2026-10-09T08:06:00.636Z",
+        "updatedAt": "2026-10-09T08:06:00.636Z"
+      }
+    ]
+  },
+  "PropertyBooking": {
+    "count": 1,
+    "rows": [
+      {
+        "id": "book-1",
+        "propertyId": "prop-villa-1",
+        "propertyTitle": "Green Meadows Luxury 4 BHK Villa",
+        "propertyCategory": "Villas",
+        "propertyPrice": 28500000,
+        "planType": "PLATINUM",
+        "bookerRole": "BUYER",
+        "bookerId": "usr-buyer-1",
+        "bookerName": "Rajesh Kumar",
+        "bookerEmail": "buyer@acresbazaar.com",
+        "bookerPhone": "+91 98401 11223",
+        "dealerId": null,
+        "dealerName": null,
+        "dealerCompany": null,
+        "dealerEmail": null,
+        "dealerPhone": null,
+        "sellerId": "usr-seller-2",
+        "sellerName": "Sunita Reddy",
+        "sellerEmail": "seller@acresbazaar.com",
+        "sellerPhone": "+91 99001 88990",
+        "bookingAmount": 50000,
+        "bookingStatus": "CONFIRMED",
+        "notes": "Scheduled for private site inspection with owner on weekend",
+        "bookingDate": "2026-10-09T08:06:12.932Z",
+        "createdAt": "2026-10-09T08:06:12.932Z",
+        "updatedAt": "2026-10-09T08:06:12.932Z"
+      }
+    ]
+  },
+  "PropertyImage": {
+    "count": 12,
+    "rows": [
+      {
+        "id": "img-1-1",
+        "propertyId": "prop-villa-1",
+        "imageUrl": "https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=800&q=80",
+        "isPrimary": true,
+        "displayOrder": 0
+      },
+      {
+        "id": "img-1-2",
+        "propertyId": "prop-villa-1",
+        "imageUrl": "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80",
+        "isPrimary": false,
+        "displayOrder": 1
+      },
+      {
+        "id": "img-10-1",
+        "propertyId": "prop-dealer-10",
+        "imageUrl": "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80",
+        "isPrimary": true,
+        "displayOrder": 0
+      },
+      {
+        "id": "img-2-1",
+        "propertyId": "prop-plot-2",
+        "imageUrl": "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=800&q=80",
+        "isPrimary": true,
+        "displayOrder": 0
+      },
+      {
+        "id": "img-3-1",
+        "propertyId": "prop-apt-3",
+        "imageUrl": "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80",
+        "isPrimary": true,
+        "displayOrder": 0
+      },
+      {
+        "id": "img-3-2",
+        "propertyId": "prop-apt-3",
+        "imageUrl": "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80",
+        "isPrimary": false,
+        "displayOrder": 1
+      },
+      {
+        "id": "img-4-1",
+        "propertyId": "prop-comm-4",
+        "imageUrl": "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=800&q=80",
+        "isPrimary": true,
+        "displayOrder": 0
+      },
+      {
+        "id": "img-5-1",
+        "propertyId": "prop-house-5",
+        "imageUrl": "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80",
+        "isPrimary": true,
+        "displayOrder": 0
+      },
+      {
+        "id": "img-6-1",
+        "propertyId": "prop-farm-6",
+        "imageUrl": "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=800&q=80",
+        "isPrimary": true,
+        "displayOrder": 0
+      },
+      {
+        "id": "img-7-1",
+        "propertyId": "prop-snap-pending-7",
+        "imageUrl": "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=800&q=80",
+        "isPrimary": true,
+        "displayOrder": 0
+      },
+      {
+        "id": "img-8-1",
+        "propertyId": "prop-hold-8",
+        "imageUrl": "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=80",
+        "isPrimary": true,
+        "displayOrder": 0
+      },
+      {
+        "id": "img-9-1",
+        "propertyId": "prop-rejected-9",
+        "imageUrl": "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=800&q=80",
+        "isPrimary": true,
+        "displayOrder": 0
+      }
+    ]
+  },
+  "Plan": {
+    "count": 2,
+    "rows": [
+      {
+        "id": "plan-gold",
+        "planId": "gold",
+        "name": "Gold Membership Plan",
+        "price": 1000,
+        "description": "Essential access for active property buyers & dealers",
+        "benefits": "[\"Access to verified Gold property dossiers\",\"Direct phone numbers of 50+ property owners\",\"SMS & WhatsApp instant alerts for new listings\",\"Standard customer support\"]",
+        "features": "[\"Full property specs and survey approvals\",\"Downloadable property title verification records\"]",
+        "isActive": true,
+        "content": "Gold Plan Tier",
+        "createdAt": "2026-10-09T08:05:58.951Z",
+        "updatedAt": "2026-10-09T08:05:58.951Z"
+      },
+      {
+        "id": "plan-platinum",
+        "planId": "platinum",
+        "name": "Platinum VIP Membership Plan",
+        "price": 3000,
+        "description": "VIP All-Access tier for high-net-worth investors & luxury buyers",
+        "benefits": "[\"Unlimited access to all Platinum & Gold properties\",\"Direct owner & developer negotiation concierge\",\"Legal title audit dossiers & encumbrance certificates\",\"Dedicated relationship manager 24/7\"]",
+        "features": "[\"Instant off-market deal broadcasts\",\"Zero commission buyer guarantee\"]",
+        "isActive": true,
+        "content": "Platinum VIP Tier",
+        "createdAt": "2026-10-09T08:06:00.124Z",
+        "updatedAt": "2026-10-09T08:06:00.124Z"
+      }
+    ]
+  },
+  "Reward": {
+    "count": 0,
+    "rows": []
+  },
+  "Report": {
+    "count": 0,
+    "rows": []
+  },
+  "VerifiedPartner": {
+    "count": 0,
+    "rows": []
+  },
+  "WebsiteSetting": {
+    "count": 9,
+    "rows": [
+      {
+        "id": "24c9f1b8-bd11-420a-aba7-887d2d062349",
+        "key": "contact_address",
+        "value": "Level 14, Zenith World Trade Tower, Outer Ring Road, Bangalore - 560103",
+        "group": "contact",
+        "updatedAt": "2026-10-09T08:06:12.076Z"
+      },
+      {
+        "id": "4cac61ab-76bc-499e-9eeb-7dfc14e1776a",
+        "key": "logo_url",
+        "value": "/uploads/logo-1790851863558.jpg",
+        "group": "logo",
+        "updatedAt": "2026-10-09T08:06:12.709Z"
+      },
+      {
+        "id": "6996020c-d381-4a9a-9e99-d22f012986e1",
+        "key": "hero_title",
+        "value": "India's Most Trusted Direct Real Estate Marketplace",
+        "group": "home",
+        "updatedAt": "2026-10-09T08:06:11.084Z"
+      },
+      {
+        "id": "7dfa15ce-b0bc-4832-86c9-2a82d8497d58",
+        "key": "website_name",
+        "value": "AcresBazaar",
+        "group": "home",
+        "updatedAt": "2026-10-09T08:06:10.364Z"
+      },
+      {
+        "id": "8c92beac-f04b-4232-b3c4-24fd44437988",
+        "key": "website_logo",
+        "value": "/uploads/logo-1790851863558.jpg",
+        "group": "logo",
+        "updatedAt": "2026-10-09T08:06:12.497Z"
+      },
+      {
+        "id": "94f86374-be1d-4a1f-93a9-5d1cc07f8964",
+        "key": "contact_phone",
+        "value": "+91 98401 99999",
+        "group": "contact",
+        "updatedAt": "2026-10-09T08:06:11.858Z"
+      },
+      {
+        "id": "c9529a84-f170-4128-a02e-e0fcae0e5c83",
+        "key": "contact_subtitle",
+        "value": "Have questions about property listings, buyer plans, or partner rewards? Our team is here to assist you 24/7.",
+        "group": "contact",
+        "updatedAt": "2026-10-09T08:06:12.277Z"
+      },
+      {
+        "id": "cdcb5db7-8c22-4045-82b9-b8a729318fc0",
+        "key": "hero_subtitle",
+        "value": "Browse 100% verified Gold & Platinum properties directly from verified sellers & dealers with zero brokerage.",
+        "group": "home",
+        "updatedAt": "2026-10-09T08:06:11.425Z"
+      },
+      {
+        "id": "f2ea0384-f2d6-468e-87fb-ec6e2655b2b4",
+        "key": "contact_email",
+        "value": "support@acresbazaar.com",
+        "group": "contact",
+        "updatedAt": "2026-10-09T08:06:11.637Z"
+      }
+    ]
+  },
+  "Chat": {
+    "count": 0,
+    "rows": []
+  },
+  "CalendarEvent": {
+    "count": 0,
+    "rows": []
+  },
+  "UserActivity": {
+    "count": 0,
+    "rows": []
+  },
+  "PartnerWallet": {
+    "count": 0,
+    "rows": []
+  },
+  "PointsLedger": {
+    "count": 0,
+    "rows": []
+  },
+  "PartnerBankDetail": {
+    "count": 0,
+    "rows": []
+  },
+  "RewardClaim": {
+    "count": 0,
+    "rows": []
+  },
+  "RewardSetting": {
+    "count": 0,
+    "rows": []
+  }
+}

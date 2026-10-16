@@ -6,8 +6,7 @@ async function inspect() {
   console.log('📦 ACRESBAZAAR DATABASE INSPECTION REPORT');
   console.log('===============================================================\n');
 
-  console.log('Database Engine: SQLite (Local Embedded High-Performance Relational DB)');
-  console.log('Database File:   backend/prisma/dev.db');
+  console.log('Database Engine: PostgreSQL (ACID Relational Enterprise Database)');
   console.log('ORM:             Prisma Client 5.x\n');
 
   // Count records in all models
