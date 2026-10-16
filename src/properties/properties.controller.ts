@@ -1,4 +1,8 @@
-import { Controller, Get, Post, Patch, Delete, Param, Query, Body, UseGuards, Request, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Query, Body, UseGuards, Request, ForbiddenException, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname, join } from 'path';
+import * as fs from 'fs';
 import { PropertiesService } from './properties.service';
 import { AdminGuard, JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../common/permissions/permissions.guard';
@@ -200,6 +204,21 @@ export class PropertiesController {
     return this.propertiesService.updateStatus(id, body.status, tier, req?.user);
   }
 
+  // Admin: Update Property Details Visibility (ON / OFF toggle)
+  @UseGuards(AdminGuard, PermissionsGuard)
+  @RequirePermissions('properties.update', 'properties')
+  @Patch(':id/visibility')
+  async updateVisibility(
+    @Param('id') id: string,
+    @Body() body: { detailsVisible: boolean },
+    @Request() req: any
+  ) {
+    if (typeof body.detailsVisible !== 'boolean') {
+      throw new BadRequestException('detailsVisible must be a boolean (true or false)');
+    }
+    return this.propertiesService.updateVisibility(id, body.detailsVisible, req?.user);
+  }
+
   // Edit property details (Seller/Dealer can edit their own, Admin can edit any)
   @UseGuards(JwtAuthGuard)
   @Patch(':id')
@@ -266,6 +285,56 @@ export class PropertiesController {
       }
     }
     return this.propertiesService.addImages(id, body.images, req?.user);
+  }
+
+  // Upload Video file via multipart (Admin or Owner only, Max 50MB, Max 2 videos per property)
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/videos/upload')
+  @UseInterceptors(FileInterceptor('video', {
+    storage: diskStorage({
+      destination: (req, file, cb) => {
+        const uploadsDir = join(process.cwd(), 'uploads');
+        if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+        cb(null, uploadsDir);
+      },
+      filename: (req, file, cb) => {
+        const ext = extname(file.originalname) || '.mp4';
+        cb(null, `vid-${Date.now()}-${Math.random().toString(36).substring(2, 8)}${ext}`);
+      }
+    }),
+    limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit
+  }))
+  async uploadVideo(
+    @Param('id') id: string,
+    @UploadedFile() file: any,
+    @Request() req: any
+  ) {
+    if (!file) throw new BadRequestException('No video file uploaded or file exceeds 50MB limit');
+    const videoUrl = `/uploads/${file.filename}`;
+    return this.propertiesService.addVideo(id, { videoUrl }, req.user);
+  }
+
+  // Add Video via JSON (Base64 dataUrl or video URL)
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/videos')
+  async addVideo(
+    @Param('id') id: string,
+    @Body() body: { videoUrl?: string; videoBase64?: string; title?: string },
+    @Request() req: any
+  ) {
+    return this.propertiesService.addVideo(id, body, req.user);
+  }
+
+  // Delete Video from property (Admin or Owner only)
+  @UseGuards(JwtAuthGuard)
+  @Delete(':id/videos')
+  async deleteVideo(
+    @Param('id') id: string,
+    @Body() body: { videoUrl: string },
+    @Request() req: any
+  ) {
+    if (!body?.videoUrl) throw new BadRequestException('videoUrl is required to delete video');
+    return this.propertiesService.deleteVideo(id, body.videoUrl, req.user);
   }
 
   // Delete property (Seller/Dealer can delete their own, Admin can delete any)

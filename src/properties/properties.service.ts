@@ -63,6 +63,89 @@ function saveBase64Image(dataUrl: string, category?: string): string {
   return getCategoryFallbackImage(category);
 }
 
+export function isVideoUrl(url?: string): boolean {
+  if (!url || typeof url !== 'string') return false;
+  const lower = url.toLowerCase().trim();
+  return lower.startsWith('data:video/') || 
+         lower.endsWith('.mp4') || 
+         lower.endsWith('.webm') || 
+         lower.endsWith('.mov') || 
+         lower.endsWith('.ogg') || 
+         lower.endsWith('.m4v') ||
+         lower.includes('/uploads/vid-');
+}
+
+export function saveBase64Video(dataUrl: string): string {
+  if (!dataUrl || typeof dataUrl !== 'string') return '';
+  const trimmed = dataUrl.trim();
+  if (trimmed.startsWith('data:video/')) {
+    try {
+      const matches = trimmed.match(/^data:video\/([a-zA-Z0-9+.-]+);base64,(.+)$/);
+      if (matches && matches[2]) {
+        const rawExt = matches[1].toLowerCase();
+        const ext = rawExt.includes('webm') ? 'webm' : rawExt.includes('quicktime') || rawExt.includes('mov') ? 'mov' : 'mp4';
+        const buffer = Buffer.from(matches[2], 'base64');
+        // Validate Max Allowed File Size: 50MB (52,428,800 bytes)
+        if (buffer.length > 50 * 1024 * 1024) {
+          throw new BadRequestException('Video file size exceeds maximum allowed 50MB limit');
+        }
+        const uploadsDir = path.join(process.cwd(), 'uploads');
+        if (!fs.existsSync(uploadsDir)) {
+          fs.mkdirSync(uploadsDir, { recursive: true });
+        }
+        const fileName = `vid-${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`;
+        const filePath = path.join(uploadsDir, fileName);
+        fs.writeFileSync(filePath, buffer);
+        return `/uploads/${fileName}`;
+      }
+    } catch (err: any) {
+      if (err instanceof BadRequestException) throw err;
+      return trimmed;
+    }
+  }
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('/uploads/')) {
+    return trimmed;
+  }
+  return trimmed;
+}
+
+export function extractPropertyVideos(p: any): string[] {
+  let vids: string[] = [];
+  try {
+    if (p.categorySpecs) {
+      const parsed = typeof p.categorySpecs === 'string' ? JSON.parse(p.categorySpecs) : p.categorySpecs;
+      if (Array.isArray(parsed?.videos)) {
+        vids = parsed.videos.filter((v: any) => typeof v === 'string' && v.trim().length > 0);
+      }
+    }
+  } catch {}
+  if (Array.isArray(p.images)) {
+    p.images.forEach((img: any) => {
+      const url = typeof img === 'string' ? img : (img?.imageUrl || img?.url || '');
+      if (isVideoUrl(url) && !vids.includes(url)) {
+        vids.push(url);
+      }
+    });
+  }
+  return vids.slice(0, 2);
+}
+
+export function extractPropertyDetailsVisible(p: any): boolean {
+  try {
+    if (p && p.categorySpecs) {
+      const specs = typeof p.categorySpecs === 'string' ? JSON.parse(p.categorySpecs) : p.categorySpecs;
+      if (typeof specs?.detailsVisible === 'boolean') {
+        return specs.detailsVisible;
+      }
+      if (typeof specs?.isDetailsLocked === 'boolean') {
+        return !specs.isDetailsLocked;
+      }
+    }
+  } catch {}
+  return true; // Default ON (visible according to normal website display rules)
+}
+
+
 function parseBudgetRange(budget?: string): { min?: number; max?: number } {
   if (!budget || budget === 'any' || budget === 'ALL') return {};
   const b = budget.toLowerCase().trim();
@@ -239,9 +322,12 @@ export class PropertiesService {
     });
 
     const sanitizedProperties = properties.map(p => {
+      const vids = extractPropertyVideos(p);
+      const isVisible = extractPropertyDetailsVisible(p);
       let imgs = (p.images || []).map(img => ({
         ...img,
-        imageUrl: saveBase64Image(img.imageUrl, p.category)
+        imageUrl: saveBase64Image(img.imageUrl, p.category),
+        mediaType: isVideoUrl(img.imageUrl) ? 'VIDEO' : 'IMAGE'
       }));
       if (imgs.length === 0) {
         imgs = [{
@@ -249,13 +335,19 @@ export class PropertiesService {
           propertyId: p.id,
           imageUrl: getCategoryFallbackImage(p.category),
           isPrimary: true,
-          displayOrder: 0
+          displayOrder: 0,
+          mediaType: 'IMAGE'
         } as any];
       }
       const owner_contact = extractOwnerContact(p);
       return { 
         ...p, 
+        detailsVisible: isVisible,
+        isDetailsLocked: !isVisible,
         images: imgs,
+        videos: vids,
+        videoCount: vids.length,
+        hasVideos: vids.length > 0,
         owner_contact,
         ownerContact: owner_contact
       };
@@ -277,9 +369,12 @@ export class PropertiesService {
     if (!property) {
       throw new NotFoundException('Property not found');
     }
+    const vids = extractPropertyVideos(property);
+    const isVisible = extractPropertyDetailsVisible(property);
     let imgs = (property.images || []).map(img => ({
       ...img,
-      imageUrl: saveBase64Image(img.imageUrl, property.category)
+      imageUrl: saveBase64Image(img.imageUrl, property.category),
+      mediaType: isVideoUrl(img.imageUrl) ? 'VIDEO' : 'IMAGE'
     }));
     if (imgs.length === 0) {
       imgs = [{
@@ -287,7 +382,8 @@ export class PropertiesService {
         propertyId: property.id,
         imageUrl: getCategoryFallbackImage(property.category),
         isPrimary: true,
-        displayOrder: 0
+        displayOrder: 0,
+        mediaType: 'IMAGE'
       } as any];
     }
     const owner_contact = extractOwnerContact(property);
@@ -295,7 +391,12 @@ export class PropertiesService {
       success: true, 
       property: { 
         ...property, 
+        detailsVisible: isVisible,
+        isDetailsLocked: !isVisible,
         images: imgs,
+        videos: vids,
+        videoCount: vids.length,
+        hasVideos: vids.length > 0,
         owner_contact,
         ownerContact: owner_contact
       } 
@@ -322,6 +423,7 @@ export class PropertiesService {
     dealerCompany?: string;
     categorySpecs?: any;
     images?: any[];
+    videos?: any[];
     status?: string; // default PENDING unless Admin specifies
   }) {
     const title = (data.title || '').trim();
@@ -362,16 +464,38 @@ export class PropertiesService {
     let planType = (data.planType || 'PLATINUM').toUpperCase().trim();
     if (planType === 'PREMIUM') planType = 'PLATINUM';
 
+    // Handle Video Uploads (Maximum 2 videos per property, Max 50MB each)
+    let videoList: string[] = [];
+    if (Array.isArray((data as any).videos)) {
+      const rawVideos = (data as any).videos;
+      if (rawVideos.length > 2) {
+        throw new BadRequestException('Maximum 2 videos allowed per property');
+      }
+      videoList = rawVideos
+        .map((v: any) => (typeof v === 'string' ? v : (v?.videoUrl || v?.url || v?.dataUrl || '')))
+        .filter((url: string) => typeof url === 'string' && url.trim().length > 0)
+        .map((url: string) => saveBase64Video(url))
+        .slice(0, 2);
+    }
+
     // Serialize categorySpecs safely
     let specsStr: string | null = null;
     let isSnapProperty = false;
+    let parsedSpecs: any = {};
     if (data.categorySpecs !== undefined && data.categorySpecs !== null) {
-      specsStr = typeof data.categorySpecs === 'object' ? JSON.stringify(data.categorySpecs) : String(data.categorySpecs);
       try {
-        const parsed = typeof data.categorySpecs === 'object' ? data.categorySpecs : JSON.parse(specsStr);
-        if (parsed?.isSnapProperty) isSnapProperty = true;
+        parsedSpecs = typeof data.categorySpecs === 'object' ? { ...data.categorySpecs } : JSON.parse(String(data.categorySpecs));
+        if (parsedSpecs?.isSnapProperty) isSnapProperty = true;
       } catch {}
     }
+    if ((data as any).detailsVisible !== undefined) {
+      parsedSpecs.detailsVisible = Boolean((data as any).detailsVisible);
+      parsedSpecs.isDetailsLocked = !Boolean((data as any).detailsVisible);
+    }
+    if (videoList.length > 0) {
+      parsedSpecs.videos = videoList;
+    }
+    specsStr = Object.keys(parsedSpecs).length > 0 ? JSON.stringify(parsedSpecs) : null;
 
     // Detect role
     const rawRole = (data.sellerRole || '').toUpperCase().trim();
@@ -486,10 +610,18 @@ export class PropertiesService {
       }
     });
 
+    const vids = extractPropertyVideos(property);
     return {
       success: true,
       message: 'Property created successfully' + (status === 'PENDING' ? ' and submitted for admin review.' : '.'),
-      property
+      property: {
+        ...property,
+        detailsVisible: extractPropertyDetailsVisible(property),
+        isDetailsLocked: !extractPropertyDetailsVisible(property),
+        videos: vids,
+        videoCount: vids.length,
+        hasVideos: vids.length > 0
+      }
     };
   }
 
@@ -620,6 +752,62 @@ export class PropertiesService {
     };
   }
 
+  // 4b. Update Property Details Visibility (Admin ON / OFF toggle)
+  async updateVisibility(id: string, detailsVisible: boolean, adminUser?: any) {
+    const property = await this.prisma.property.findUnique({
+      where: { id },
+      include: {
+        images: { orderBy: { displayOrder: 'asc' } },
+        seller: true
+      }
+    });
+    if (!property) {
+      throw new NotFoundException('Property not found');
+    }
+
+    let specs: any = {};
+    try {
+      if (property.categorySpecs) {
+        specs = typeof property.categorySpecs === 'string' ? JSON.parse(property.categorySpecs) : property.categorySpecs;
+      }
+    } catch {}
+
+    const isVisible = Boolean(detailsVisible);
+    specs.detailsVisible = isVisible;
+    specs.isDetailsLocked = !isVisible;
+
+    const updated = await this.prisma.property.update({
+      where: { id },
+      data: {
+        categorySpecs: JSON.stringify(specs)
+      },
+      include: {
+        images: { orderBy: { displayOrder: 'asc' } },
+        seller: true
+      }
+    });
+
+    const vids = extractPropertyVideos(updated);
+    const owner_contact = extractOwnerContact(updated);
+
+    return {
+      success: true,
+      message: `Property details visibility set to ${isVisible ? 'ON (Visible)' : 'OFF (Locked)'}`,
+      detailsVisible: isVisible,
+      isDetailsLocked: !isVisible,
+      property: {
+        ...updated,
+        detailsVisible: isVisible,
+        isDetailsLocked: !isVisible,
+        videos: vids,
+        videoCount: vids.length,
+        hasVideos: vids.length > 0,
+        owner_contact,
+        ownerContact: owner_contact
+      }
+    };
+  }
+
   // 5. Update Property Details (Strict Ownership Check for non-admin)
   async update(id: string, data: any, user?: any) {
     const property = await this.prisma.property.findUnique({ where: { id }, include: { images: true } });
@@ -645,9 +833,39 @@ export class PropertiesService {
       }
     }
 
-    const specsStr = data.categorySpecs && typeof data.categorySpecs === 'object'
-      ? JSON.stringify(data.categorySpecs)
-      : data.categorySpecs;
+    // Merge categorySpecs and handle videos (Strict Limit: Max 2 videos per property, Max 50MB)
+    let currentSpecs: any = {};
+    try {
+      if (property.categorySpecs) {
+        currentSpecs = typeof property.categorySpecs === 'string' ? JSON.parse(property.categorySpecs) : property.categorySpecs;
+      }
+    } catch {}
+
+    if (data.categorySpecs !== undefined && data.categorySpecs !== null) {
+      try {
+        const incomingSpecs = typeof data.categorySpecs === 'string' ? JSON.parse(data.categorySpecs) : data.categorySpecs;
+        currentSpecs = { ...currentSpecs, ...incomingSpecs };
+      } catch {}
+    }
+
+    if (data.detailsVisible !== undefined) {
+      currentSpecs.detailsVisible = Boolean(data.detailsVisible);
+      currentSpecs.isDetailsLocked = !Boolean(data.detailsVisible);
+    }
+
+    if (Array.isArray(data.videos)) {
+      if (data.videos.length > 2) {
+        throw new BadRequestException('Maximum 2 videos allowed per property');
+      }
+      const cleanVideos = data.videos
+        .map((v: any) => (typeof v === 'string' ? v : (v?.videoUrl || v?.url || v?.dataUrl || '')))
+        .filter((url: string) => typeof url === 'string' && url.trim().length > 0)
+        .map((url: string) => saveBase64Video(url))
+        .slice(0, 2);
+      currentSpecs.videos = cleanVideos;
+    }
+
+    const specsStr = Object.keys(currentSpecs).length > 0 ? JSON.stringify(currentSpecs) : (property.categorySpecs || null);
 
     // Handle images update if provided
     if (Array.isArray(data.images)) {
@@ -692,7 +910,20 @@ export class PropertiesService {
       await this.awardApprovalPointsIdempotent(id, user);
     }
 
-    return { success: true, message: 'Property updated successfully', property: updated };
+    const vids = extractPropertyVideos(updated);
+    const isVisible = extractPropertyDetailsVisible(updated);
+    return { 
+      success: true, 
+      message: 'Property updated successfully', 
+      property: {
+        ...updated,
+        detailsVisible: isVisible,
+        isDetailsLocked: !isVisible,
+        videos: vids,
+        videoCount: vids.length,
+        hasVideos: vids.length > 0
+      } 
+    };
   }
 
   // 5b. Set Cover / Primary Image for a property
@@ -800,6 +1031,108 @@ export class PropertiesService {
     });
 
     return { success: true, message: 'Images added successfully', images: updatedImages };
+  }
+
+  // 5e. Add Video to Property (Admin or Owner only, Max 2 videos, Max 50MB)
+  async addVideo(propertyId: string, videoData: { videoUrl?: string; videoBase64?: string; title?: string }, user?: any) {
+    const property = await this.prisma.property.findUnique({ where: { id: propertyId } });
+    if (!property) throw new NotFoundException('Property not found');
+
+    if (!user) throw new ForbiddenException('Authentication required to upload videos');
+
+    const isAdmin = user.role === 'SUPER_ADMIN' || user.role === 'ADMIN' || user.type === 'admin';
+    if (!isAdmin) {
+      const isOwner = property.sellerId === user.sub || 
+                      property.sellerId === user.id || 
+                      (user.email && property.sellerEmail?.toLowerCase() === user.email.toLowerCase());
+      if (!isOwner) {
+        throw new ForbiddenException('Access denied: You can only upload videos to your own properties');
+      }
+    }
+
+    let specs: any = {};
+    try {
+      specs = property.categorySpecs ? JSON.parse(property.categorySpecs) : {};
+    } catch {}
+
+    const currentVideos: string[] = Array.isArray(specs.videos) ? specs.videos : [];
+    if (currentVideos.length >= 2) {
+      throw new BadRequestException('Maximum 2 videos per property reached. Please delete an existing video to add a new one.');
+    }
+
+    const rawUrl = videoData.videoBase64 || videoData.videoUrl;
+    if (!rawUrl || typeof rawUrl !== 'string' || !rawUrl.trim()) {
+      throw new BadRequestException('Video data or URL is required');
+    }
+
+    const savedUrl = saveBase64Video(rawUrl.trim());
+    if (!savedUrl) {
+      throw new BadRequestException('Invalid video format or failed to save video');
+    }
+
+    const updatedVideos = [...currentVideos, savedUrl].slice(0, 2);
+    specs.videos = updatedVideos;
+
+    await this.prisma.property.update({
+      where: { id: propertyId },
+      data: { categorySpecs: JSON.stringify(specs) }
+    });
+
+    return {
+      success: true,
+      message: 'Video uploaded successfully',
+      videos: updatedVideos,
+      videoCount: updatedVideos.length
+    };
+  }
+
+  // 5f. Delete Video from Property (Admin or Owner only)
+  async deleteVideo(propertyId: string, videoUrl: string, user?: any) {
+    const property = await this.prisma.property.findUnique({ where: { id: propertyId } });
+    if (!property) throw new NotFoundException('Property not found');
+
+    if (!user) throw new ForbiddenException('Authentication required to delete videos');
+
+    const isAdmin = user.role === 'SUPER_ADMIN' || user.role === 'ADMIN' || user.type === 'admin';
+    if (!isAdmin) {
+      const isOwner = property.sellerId === user.sub || 
+                      property.sellerId === user.id || 
+                      (user.email && property.sellerEmail?.toLowerCase() === user.email.toLowerCase());
+      if (!isOwner) {
+        throw new ForbiddenException('Access denied: You can only delete videos from your own properties');
+      }
+    }
+
+    let specs: any = {};
+    try {
+      specs = property.categorySpecs ? JSON.parse(property.categorySpecs) : {};
+    } catch {}
+
+    const currentVideos: string[] = Array.isArray(specs.videos) ? specs.videos : [];
+    const targetUrl = (videoUrl || '').trim();
+    const updatedVideos = currentVideos.filter(v => v !== targetUrl && !v.endsWith(targetUrl));
+    specs.videos = updatedVideos;
+
+    await this.prisma.property.update({
+      where: { id: propertyId },
+      data: { categorySpecs: JSON.stringify(specs) }
+    });
+
+    if (targetUrl.startsWith('/uploads/vid-')) {
+      try {
+        const filePath = path.join(process.cwd(), targetUrl.replace(/^\//, ''));
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      } catch {}
+    }
+
+    return {
+      success: true,
+      message: 'Video deleted successfully',
+      videos: updatedVideos,
+      videoCount: updatedVideos.length
+    };
   }
 
   // 6. Delete Property (Strict Ownership Check for non-admin)
@@ -1053,6 +1386,7 @@ export class PropertiesService {
           ...rawImages.filter(i => i.id !== coverObj.id).map(i => i.imageUrl)
         ];
 
+        const vids = extractPropertyVideos(p);
         return {
           id: p.id,
           title: p.title,
@@ -1069,9 +1403,14 @@ export class PropertiesService {
           coverImage: mainImage,
           galleryImages: galleryImages,
           images: rawImages,
+          videos: vids,
+          videoCount: vids.length,
+          hasVideos: vids.length > 0,
           totalImages: galleryImages.length,
           imageCount: galleryImages.length,
           specs,
+          detailsVisible: extractPropertyDetailsVisible(p),
+          isDetailsLocked: !extractPropertyDetailsVisible(p),
           owner_contact: extractOwnerContact(p),
           ownerContact: extractOwnerContact(p),
           sellerName: extractOwnerContact(p).name,

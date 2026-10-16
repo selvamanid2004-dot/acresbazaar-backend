@@ -22,18 +22,22 @@ async function bootstrap() {
     fs.mkdirSync(uploadsDir, { recursive: true });
   }
 
-  // Increase payload limit for image uploads
-  app.use(json({ limit: '30mb' }));
-  app.use(urlencoded({ extended: true, limit: '30mb' }));
+  // Increase payload limit for video and image uploads (Supports videos up to 50MB)
+  app.use(json({ limit: '100mb' }));
+  app.use(urlencoded({ extended: true, limit: '100mb' }));
 
-  // Serve uploaded images statically
+  // Serve uploaded images and videos statically
   app.useStaticAssets(uploadsDir, {
     prefix: '/uploads/',
   });
 
-  // Fallback for missing /uploads/* images (prevents broken 404 images on ephemeral instances)
+  // Fallback for missing /uploads/* files
   app.use('/uploads', (req: any, res: any, next: any) => {
     const reqPath = (req.path || '').toLowerCase();
+    // Do not redirect video requests to unsplash image
+    if (reqPath.endsWith('.mp4') || reqPath.endsWith('.webm') || reqPath.endsWith('.mov') || reqPath.endsWith('.ogg') || reqPath.endsWith('.m4v')) {
+      return res.status(404).send('Video not found');
+    }
     if (reqPath.includes('logo')) {
       try {
         const files = fs.readdirSync(uploadsDir).filter(f => f.toLowerCase().startsWith('logo-'));
