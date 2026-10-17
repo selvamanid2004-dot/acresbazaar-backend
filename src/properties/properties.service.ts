@@ -624,13 +624,17 @@ export class PropertiesService {
       sellerName = isDealerListing ? 'Authorized Dealer' : 'Registered Seller';
     }
 
-    // Normalize images: accept string URLs, image objects, and provide fallback
+    // Normalize images: accept string URLs, image objects, and provide fallback (Maximum 5 photos per property)
     let imageList: string[] = [];
     if (Array.isArray(data.images)) {
+      if (data.images.length > 5) {
+        throw new BadRequestException('Maximum 5 photos allowed per property');
+      }
       imageList = data.images
         .map((img: any) => (typeof img === 'string' ? img : (img?.imageUrl || img?.url || '')))
         .filter((url: string) => typeof url === 'string' && url.trim().length > 0)
-        .map((url: string) => saveBase64Image(url, category));
+        .map((url: string) => saveBase64Image(url, category))
+        .slice(0, 5);
     }
     if (imageList.length === 0) {
       imageList.push(getCategoryFallbackImage(category));
@@ -1074,6 +1078,9 @@ export class PropertiesService {
       .map((url: string) => saveBase64Image(url, property.category));
 
     const existingCount = await this.prisma.propertyImage.count({ where: { propertyId } });
+    if (existingCount + cleanImages.length > 5) {
+      throw new BadRequestException(`Maximum 5 photos allowed per property. This property currently has ${existingCount} photos.`);
+    }
 
     for (let idx = 0; idx < cleanImages.length; idx++) {
       await this.prisma.propertyImage.create({
@@ -1614,7 +1621,14 @@ export class PropertiesService {
       conditions.push({ sellerId: filter.sellerId.trim() });
     }
     if (filter.email && filter.email.trim()) {
-      conditions.push({ sellerEmail: filter.email.trim().toLowerCase() });
+      const cleanEmail = filter.email.trim().toLowerCase();
+      conditions.push({ sellerEmail: cleanEmail });
+      try {
+        const u = await this.prisma.user.findUnique({ where: { email: cleanEmail } });
+        if (u) {
+          conditions.push({ sellerId: u.id });
+        }
+      } catch {}
     }
     if (filter.phone && filter.phone.trim()) {
       conditions.push({ sellerPhone: filter.phone.trim() });
@@ -1630,14 +1644,48 @@ export class PropertiesService {
       };
     }
 
-    const where: any = { OR: conditions };
+    const where: any = {};
     if (filter.role && filter.role.trim() && filter.role.toUpperCase() !== 'ALL') {
       const cleanRole = filter.role.trim().toUpperCase();
       if (cleanRole === 'COMMON_PEOPLE' || cleanRole === 'PARTNER') {
-        where.sellerRole = { in: ['COMMON_PEOPLE', 'PARTNER'] };
+        where.AND = [
+          { OR: conditions },
+          { OR: [
+            { sellerRole: 'COMMON_PEOPLE' },
+            { sellerRole: 'PARTNER' },
+            { sellerRole: 'common_people' },
+            { sellerRole: 'partner' },
+            { seller: { role: { in: ['COMMON_PEOPLE', 'PARTNER'] } } }
+          ]}
+        ];
+      } else if (cleanRole === 'SELLER') {
+        where.AND = [
+          { OR: conditions },
+          { OR: [
+            { sellerRole: 'SELLER' },
+            { sellerRole: 'seller' },
+            { sellerRole: null },
+            { sellerRole: '' },
+            { seller: { role: 'SELLER' } }
+          ]}
+        ];
+      } else if (cleanRole === 'DEALER') {
+        where.AND = [
+          { OR: conditions },
+          { OR: [
+            { sellerRole: 'DEALER' },
+            { sellerRole: 'dealer' },
+            { seller: { role: 'DEALER' } }
+          ]}
+        ];
       } else {
-        where.sellerRole = cleanRole;
+        where.AND = [
+          { OR: conditions },
+          { sellerRole: cleanRole }
+        ];
       }
+    } else {
+      where.OR = conditions;
     }
 
     const properties = await this.prisma.property.findMany({

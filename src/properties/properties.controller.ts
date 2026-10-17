@@ -3,7 +3,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
 import * as fs from 'fs';
-import { PropertiesService } from './properties.service';
+import { PropertiesService, extractRequester } from './properties.service';
 import { AdminGuard, JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../common/permissions/permissions.guard';
 import { RequirePermissions } from '../common/permissions/permissions.decorator';
@@ -156,14 +156,25 @@ export class PropertiesController {
     return this.propertiesService.findOne(id, authHeader);
   }
 
-  // Create property (Seller, Dealer, or Admin quick-post)
-  @UseGuards(JwtAuthGuard)
+  // Create property (Seller, Dealer, Partner, Admin quick-post, or website submission)
   @Post()
   async create(@Body() body: any, @Request() req: any) {
-    if (req.user && !body.sellerId && req.user.type !== 'admin') {
-      body.sellerId = req.user.sub || req.user.id;
-      if (!body.sellerEmail && req.user.email) body.sellerEmail = req.user.email;
-      if (!body.sellerName && req.user.name) body.sellerName = req.user.name;
+    const authHeader = req?.headers?.authorization;
+    let isAdmin = false;
+    if (authHeader) {
+      try {
+        const requester = extractRequester(authHeader);
+        if (requester?.isAdmin) {
+          isAdmin = true;
+        } else if (requester) {
+          if (!body.sellerId && requester.userId) body.sellerId = requester.userId;
+          if (!body.sellerEmail && requester.email) body.sellerEmail = requester.email;
+        }
+      } catch {}
+    }
+    // Only verified Admin can directly post properties with status other than PENDING
+    if (!isAdmin) {
+      body.status = 'PENDING';
     }
     return this.propertiesService.create(body);
   }
