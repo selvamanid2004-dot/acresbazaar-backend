@@ -9,49 +9,110 @@ export class RewardsService {
   // 1. REWARD CONVERSION CONFIGURATION
   // =========================================================================
 
-  async getRewardConfig() {
+  async getRewardConfig(role?: string) {
     let setting = await this.prisma.rewardSetting.findFirst();
     if (!setting) {
       setting = await this.prisma.rewardSetting.create({
         data: {
+          partnerPointsPerProperty: 20,
+          partnerPointsPerReward: 500,
+          partnerRewardAmountInInr: 500,
+          dealerPointsPerBooking: 500,
+          dealerPointsPerReward: 500,
+          dealerRewardAmountInInr: 500,
           pointsPerReward: 500,
           rewardAmountInInr: 500,
           pointsPerProperty: 20
         }
       });
     }
+
+    const isDealer = (role || '').toUpperCase() === 'DEALER';
+
+    const partnerMin = setting.partnerPointsPerReward || setting.pointsPerReward || 500;
+    const partnerAmount = setting.partnerRewardAmountInInr || setting.rewardAmountInInr || 500;
+    const partnerPerProp = setting.partnerPointsPerProperty || setting.pointsPerProperty || 20;
+
+    const dealerMin = setting.dealerPointsPerReward || 500;
+    const dealerAmount = setting.dealerRewardAmountInInr || 500;
+    const dealerPerBook = setting.dealerPointsPerBooking || 500;
+
+    const activeMin = isDealer ? dealerMin : partnerMin;
+    const activeAmount = isDealer ? dealerAmount : partnerAmount;
+    const activePerAction = isDealer ? dealerPerBook : partnerPerProp;
+
     return {
       success: true,
       config: {
         id: setting.id,
-        pointsPerReward: setting.pointsPerReward,
-        rewardAmountInInr: setting.rewardAmountInInr,
-        pointsPerProperty: setting.pointsPerProperty,
-        conversionRateText: `${setting.pointsPerReward} Points = ₹${setting.rewardAmountInInr.toLocaleString('en-IN')}`,
-        ratePerPoint: setting.rewardAmountInInr / setting.pointsPerReward
+        // Role-resolved active configuration
+        pointsPerReward: activeMin,
+        rewardAmountInInr: activeAmount,
+        pointsPerProperty: activePerAction,
+        ratePerPoint: activeAmount / (activeMin || 1),
+        conversionRateText: `${activeMin} Points = ₹${activeAmount.toLocaleString('en-IN')}`,
+
+        // Separate explicit configuration models for Admin Panel and Dashboards
+        partner: {
+          pointsPerProperty: partnerPerProp,
+          pointsPerReward: partnerMin,
+          rewardAmountInInr: partnerAmount,
+          ratePerPoint: partnerAmount / (partnerMin || 1),
+          conversionRateText: `${partnerMin} Points = ₹${partnerAmount.toLocaleString('en-IN')}`
+        },
+        dealer: {
+          pointsPerBooking: dealerPerBook,
+          pointsPerReward: dealerMin,
+          rewardAmountInInr: dealerAmount,
+          ratePerPoint: dealerAmount / (dealerMin || 1),
+          conversionRateText: `${dealerMin} Points = ₹${dealerAmount.toLocaleString('en-IN')}`
+        }
       }
     };
   }
 
   async updateRewardConfig(data: {
+    // Partner Specific
+    partnerPointsPerProperty?: number;
+    partnerPointsPerReward?: number;
+    partnerRewardAmountInInr?: number;
+    // Dealer Specific
+    dealerPointsPerBooking?: number;
+    dealerPointsPerReward?: number;
+    dealerRewardAmountInInr?: number;
+    // Legacy / Unified
     pointsPerReward?: number;
     rewardAmountInInr?: number;
     pointsPerProperty?: number;
   }, adminUser?: any) {
     let setting = await this.prisma.rewardSetting.findFirst();
-    const updateData = {
-      ...(data.pointsPerReward ? { pointsPerReward: Number(data.pointsPerReward) } : {}),
-      ...(data.rewardAmountInInr ? { rewardAmountInInr: Number(data.rewardAmountInInr) } : {}),
-      ...(data.pointsPerProperty ? { pointsPerProperty: Number(data.pointsPerProperty) } : {}),
+
+    const updateData: any = {
+      ...(data.partnerPointsPerProperty !== undefined ? { partnerPointsPerProperty: Number(data.partnerPointsPerProperty), pointsPerProperty: Number(data.partnerPointsPerProperty) } : {}),
+      ...(data.partnerPointsPerReward !== undefined ? { partnerPointsPerReward: Number(data.partnerPointsPerReward), pointsPerReward: Number(data.partnerPointsPerReward) } : {}),
+      ...(data.partnerRewardAmountInInr !== undefined ? { partnerRewardAmountInInr: Number(data.partnerRewardAmountInInr), rewardAmountInInr: Number(data.partnerRewardAmountInInr) } : {}),
+      ...(data.dealerPointsPerBooking !== undefined ? { dealerPointsPerBooking: Number(data.dealerPointsPerBooking) } : {}),
+      ...(data.dealerPointsPerReward !== undefined ? { dealerPointsPerReward: Number(data.dealerPointsPerReward) } : {}),
+      ...(data.dealerRewardAmountInInr !== undefined ? { dealerRewardAmountInInr: Number(data.dealerRewardAmountInInr) } : {}),
+      // Legacy fallbacks if partnerSpecific fields were not passed
+      ...(data.pointsPerProperty !== undefined && data.partnerPointsPerProperty === undefined ? { pointsPerProperty: Number(data.pointsPerProperty), partnerPointsPerProperty: Number(data.pointsPerProperty) } : {}),
+      ...(data.pointsPerReward !== undefined && data.partnerPointsPerReward === undefined ? { pointsPerReward: Number(data.pointsPerReward), partnerPointsPerReward: Number(data.pointsPerReward) } : {}),
+      ...(data.rewardAmountInInr !== undefined && data.partnerRewardAmountInInr === undefined ? { rewardAmountInInr: Number(data.rewardAmountInInr), partnerRewardAmountInInr: Number(data.rewardAmountInInr) } : {}),
       updatedBy: adminUser?.name || adminUser?.email || 'Admin'
     };
 
     if (!setting) {
       setting = await this.prisma.rewardSetting.create({
         data: {
-          pointsPerReward: data.pointsPerReward ? Number(data.pointsPerReward) : 500,
-          rewardAmountInInr: data.rewardAmountInInr ? Number(data.rewardAmountInInr) : 500,
-          pointsPerProperty: data.pointsPerProperty ? Number(data.pointsPerProperty) : 20,
+          partnerPointsPerProperty: Number(data.partnerPointsPerProperty || data.pointsPerProperty || 20),
+          partnerPointsPerReward: Number(data.partnerPointsPerReward || data.pointsPerReward || 500),
+          partnerRewardAmountInInr: Number(data.partnerRewardAmountInInr || data.rewardAmountInInr || 500),
+          dealerPointsPerBooking: Number(data.dealerPointsPerBooking || 500),
+          dealerPointsPerReward: Number(data.dealerPointsPerReward || 500),
+          dealerRewardAmountInInr: Number(data.dealerRewardAmountInInr || 500),
+          pointsPerReward: Number(data.partnerPointsPerReward || data.pointsPerReward || 500),
+          rewardAmountInInr: Number(data.partnerRewardAmountInInr || data.rewardAmountInInr || 500),
+          pointsPerProperty: Number(data.partnerPointsPerProperty || data.pointsPerProperty || 20),
           updatedBy: adminUser?.name || 'Admin'
         }
       });
@@ -62,18 +123,7 @@ export class RewardsService {
       });
     }
 
-    return {
-      success: true,
-      message: 'Reward conversion settings updated successfully',
-      config: {
-        id: setting.id,
-        pointsPerReward: setting.pointsPerReward,
-        rewardAmountInInr: setting.rewardAmountInInr,
-        pointsPerProperty: setting.pointsPerProperty,
-        conversionRateText: `${setting.pointsPerReward} Points = ₹${setting.rewardAmountInInr.toLocaleString('en-IN')}`,
-        ratePerPoint: setting.rewardAmountInInr / setting.pointsPerReward
-      }
-    };
+    return this.getRewardConfig();
   }
 
   // =========================================================================
@@ -227,7 +277,7 @@ export class RewardsService {
     }
 
     // Load conversion config
-    const configRes = await this.getRewardConfig();
+    const configRes = await this.getRewardConfig(userRole);
     const config = configRes.config;
 
     // Get or initialize wallet
@@ -414,18 +464,24 @@ export class RewardsService {
         throw new BadRequestException('Partner wallet not found.');
       }
 
-      if (wallet.availablePoints < 500) {
+      let setting = await tx.rewardSetting.findFirst();
+      const isDealer = (wallet.partnerRole || '').toUpperCase() === 'DEALER' || (data.role || '').toUpperCase() === 'DEALER';
+      const minRequired = isDealer ? (setting?.dealerPointsPerReward || 500) : (setting?.partnerPointsPerReward || setting?.pointsPerReward || 500);
+      const pointsPerReward = minRequired;
+      const rewardAmountInInr = isDealer ? (setting?.dealerRewardAmountInInr || 500) : (setting?.partnerRewardAmountInInr || setting?.rewardAmountInInr || 500);
+
+      if (wallet.availablePoints < minRequired) {
         throw new BadRequestException(
-          `You need at least 500 points to claim a reward. Your available balance is ${wallet.availablePoints} points.`
+          `You need at least ${minRequired} points to claim a reward. Your available balance is ${wallet.availablePoints} points.`
         );
       }
 
       // 2. Determine points to redeem
-      let pointsToRedeem = 500;
+      let pointsToRedeem = minRequired;
       if (data.redeemOption === 'ALL') {
         pointsToRedeem = wallet.availablePoints;
       } else {
-        pointsToRedeem = 500;
+        pointsToRedeem = minRequired;
       }
 
       if (pointsToRedeem > wallet.availablePoints) {
@@ -473,10 +529,7 @@ export class RewardsService {
       });
 
       // 4. Calculate reward amount based on configurable rate
-      let setting = await tx.rewardSetting.findFirst();
-      const pointsPerReward = setting?.pointsPerReward || 500;
-      const rewardAmountInInr = setting?.rewardAmountInInr || 500;
-      const rewardAmount = Math.round((pointsToRedeem / pointsPerReward) * rewardAmountInInr);
+      const rewardAmount = Math.round((pointsToRedeem / (pointsPerReward || 1)) * rewardAmountInInr);
 
       // 5. Deduct from available and add to reserved
       const updatedWallet = await tx.partnerWallet.update({
@@ -1032,11 +1085,25 @@ export class RewardsService {
   }
 
   async getDealerRewardsSummary(email: string) {
-    return this.getPartnerWallet(email, 'DEALER');
+    const res: any = await this.getPartnerWallet(email, 'DEALER');
+    return {
+      ...res,
+      totalEarned: res.wallet?.totalEarnedPoints || 0,
+      availablePoints: res.wallet?.availablePoints || 0,
+      activeClaim: res.activeClaim || null,
+      history: res.history || []
+    };
   }
 
   async getSpotterRewardsSummary(email: string) {
-    return this.getPartnerWallet(email, 'PARTNER');
+    const res: any = await this.getPartnerWallet(email, 'PARTNER');
+    return {
+      ...res,
+      totalEarned: res.wallet?.totalEarnedPoints || 0,
+      availablePoints: res.wallet?.availablePoints || 0,
+      activeClaim: res.activeClaim || null,
+      history: res.history || []
+    };
   }
 
   async delete(id: string) {

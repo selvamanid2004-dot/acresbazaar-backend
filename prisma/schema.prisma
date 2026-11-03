@@ -339,10 +339,19 @@ model RewardClaim {
 }
 
 model RewardSetting {
-  id                String   @id @default(uuid())
-  pointsPerReward   Int      @default(500)
-  rewardAmountInInr Float    @default(500)
-  pointsPerProperty Int      @default(20)
-  updatedBy         String?
-  updatedAt         DateTime @updatedAt
+  id                        String   @id @default(uuid())
+  // Partner Specific Configuration
+  partnerPointsPerProperty  Int      @default(20)
+  partnerPointsPerReward    Int      @default(500)
+  partnerRewardAmountInInr  Float    @default(500)
+  // Dealer Specific Configuration
+  dealerPointsPerBooking    Int      @default(500)
+  dealerPointsPerReward     Int      @default(500)
+  dealerRewardAmountInInr   Float    @default(500)
+  // Legacy fields for backward compatibility
+  pointsPerReward           Int      @default(500)
+  rewardAmountInInr         Float    @default(500)
+  pointsPerProperty         Int      @default(20)
+  updatedBy                 String?
+  updatedAt                 DateTime @updatedAt
 }

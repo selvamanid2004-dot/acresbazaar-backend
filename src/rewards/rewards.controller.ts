@@ -14,8 +14,8 @@ export class RewardsController {
 
   // 1. Get Reward Conversion Config (Points required vs ₹ Amount)
   @Get('config')
-  async getRewardConfig() {
-    return this.rewardsService.getRewardConfig();
+  async getRewardConfig(@Query('role') role?: string) {
+    return this.rewardsService.getRewardConfig(role);
   }
 
   // 2. Partner Wallet: Available points, reserved points, total earned, total redeemed, ledger & claims history

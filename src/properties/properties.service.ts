@@ -699,7 +699,7 @@ export class PropertiesService {
       }
 
       const setting = await this.prisma.rewardSetting.findFirst();
-      const pointsToAward = setting?.pointsPerProperty || 20;
+      const pointsToAward = setting?.partnerPointsPerProperty || setting?.pointsPerProperty || 20;
 
       let partnerEmail = (property.sellerEmail || '').trim().toLowerCase();
       let partnerName = property.sellerName;
@@ -1860,9 +1860,12 @@ export class PropertiesService {
       }
     });
 
-    // If a Dealer booked the property under Gold or Premium Plan, award +500 Dealer Reward Points
+    // If a Dealer booked the property under Gold or Premium Plan, award dynamic Dealer Reward Points
+    let dealerPointsAwarded = 500;
     if (isDealer) {
       try {
+        const rewardSetting = await this.prisma.rewardSetting.findFirst();
+        dealerPointsAwarded = rewardSetting?.dealerPointsPerBooking ?? 500;
         await this.prisma.reward.create({
           data: {
             userName: bookerName,
@@ -1871,12 +1874,49 @@ export class PropertiesService {
             propertyTitle: property.title,
             // FIX: label now consistently says 'Platinum Plan' instead of 'Premium Plan'
             rewardTitle: `Dealer ${planType === 'GOLD' ? 'Gold Plan' : 'Platinum Plan'} Booking Reward`,
-            points: 500,
-            amount: 500,
+            points: dealerPointsAwarded,
+            amount: dealerPointsAwarded,
             reason: `Booked property "${property.title}" under ${planType === 'GOLD' ? 'Gold Plan' : 'Platinum Plan'}. Agency: ${data.dealerCompany || 'Authorized Dealer'}`,
             status: 'APPROVED'
           }
         });
+
+        // Also update dealer's PartnerWallet so Dealer Dashboard reflects the reward points
+        const cleanDealerEmail = (bookerEmail || '').trim().toLowerCase();
+        if (cleanDealerEmail) {
+          const w = await this.prisma.partnerWallet.upsert({
+            where: { partnerEmail: cleanDealerEmail },
+            create: {
+              partnerEmail: cleanDealerEmail,
+              partnerName: bookerName,
+              partnerPhone: data.dealerPhone || '',
+              partnerRole: 'DEALER',
+              availablePoints: dealerPointsAwarded,
+              reservedPoints: 0,
+              totalEarnedPoints: dealerPointsAwarded,
+              totalRedeemedPoints: 0
+            },
+            update: {
+              availablePoints: { increment: dealerPointsAwarded },
+              totalEarnedPoints: { increment: dealerPointsAwarded }
+            }
+          });
+
+          await this.prisma.pointsLedger.create({
+            data: {
+              partnerEmail: cleanDealerEmail,
+              partnerName: bookerName,
+              partnerRole: 'DEALER',
+              propertyId: property.id,
+              propertyTitle: property.title,
+              transactionType: 'DEALER_BOOKING',
+              points: dealerPointsAwarded,
+              balanceBefore: w.availablePoints - dealerPointsAwarded,
+              balanceAfter: w.availablePoints,
+              description: `Property Booking: "${property.title}" (+${dealerPointsAwarded} Points)`
+            }
+          });
+        }
       } catch (err) {
         console.error('Failed to create dealer booking reward:', err);
       }
@@ -1886,7 +1926,7 @@ export class PropertiesService {
       success: true,
       // FIX: label now consistently says 'Platinum Plan'
       message: `Property booked successfully under ${planType === 'GOLD' ? 'Gold Plan' : 'Platinum Plan'}!` +
-               (isDealer ? ' +500 Dealer Reward Points added to your account.' : ' Details forwarded to seller & admin.'),
+               (isDealer ? ` +${dealerPointsAwarded} Dealer Reward Points added to your account.` : ' Details forwarded to seller & admin.'),
       booking
     };
   }
