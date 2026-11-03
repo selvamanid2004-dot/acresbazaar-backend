@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Patch, Delete, Param, Query, Body, UseGuards, Request, ForbiddenException } from '@nestjs/common';
 import { RewardsService } from './rewards.service';
-import { AdminGuard, JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { AdminGuard, JwtAuthGuard, OptionalJwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../common/permissions/permissions.guard';
 import { RequirePermissions } from '../common/permissions/permissions.decorator';
 
@@ -19,7 +19,7 @@ export class RewardsController {
   }
 
   // 2. Partner Wallet: Available points, reserved points, total earned, total redeemed, ledger & claims history
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('partner-wallet')
   async getPartnerWallet(
     @Query('email') email: string,
@@ -32,7 +32,7 @@ export class RewardsController {
   }
 
   // 3. Save / Update Partner Bank Details
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(OptionalJwtAuthGuard)
   @Post('bank-detail')
   async saveBankDetail(@Body() body: any, @Request() req: any) {
     const isAdmin = req.user?.role === 'SUPER_ADMIN' || req.user?.role === 'ADMIN' || req.user?.type === 'admin';
@@ -43,7 +43,7 @@ export class RewardsController {
   }
 
   // 4. Partner Submit Reward Claim (500 pts OR All Points)
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(OptionalJwtAuthGuard)
   @Post('claim-reward')
   async claimReward(@Body() body: any, @Request() req: any) {
     const isAdmin = req.user?.role === 'SUPER_ADMIN' || req.user?.role === 'ADMIN' || req.user?.type === 'admin';
@@ -54,7 +54,7 @@ export class RewardsController {
   }
 
   // Legacy Endpoints (Maintained for backward compatibility)
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(OptionalJwtAuthGuard)
   @Post('claim')
   async submitClaim(@Body() body: any, @Request() req: any) {
     const isAdmin = req.user?.role === 'SUPER_ADMIN' || req.user?.role === 'ADMIN' || req.user?.type === 'admin';
@@ -64,7 +64,7 @@ export class RewardsController {
     return this.rewardsService.submitClaim(body);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('my-claim')
   async getMyClaim(@Query('email') email: string, @Request() req: any) {
     const isAdmin = req.user?.role === 'SUPER_ADMIN' || req.user?.role === 'ADMIN' || req.user?.type === 'admin';
@@ -72,7 +72,7 @@ export class RewardsController {
     return this.rewardsService.getClaimByUser(targetEmail);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('dealer-summary')
   async getDealerSummary(@Query('email') email: string, @Request() req: any) {
     const isAdmin = req.user?.role === 'SUPER_ADMIN' || req.user?.role === 'ADMIN' || req.user?.type === 'admin';

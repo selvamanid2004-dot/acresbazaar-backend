@@ -701,9 +701,42 @@ export class PropertiesService {
       const setting = await this.prisma.rewardSetting.findFirst();
       const pointsToAward = setting?.pointsPerProperty || 20;
 
-      const partnerEmail = (property.sellerEmail || '').trim().toLowerCase() || 'partner@acresbazaar.com';
-      const partnerName = property.sellerName || 'Partner';
-      const partnerRole = property.sellerRole || 'PARTNER';
+      let partnerEmail = (property.sellerEmail || '').trim().toLowerCase();
+      let partnerName = property.sellerName;
+      let partnerPhone = property.sellerPhone;
+
+      // Fallback 1: Resolve from sellerId if sellerEmail is missing
+      if ((!partnerEmail || !partnerName || !partnerPhone) && property.sellerId) {
+        try {
+          const sellerUser = await this.prisma.user.findUnique({ where: { id: property.sellerId } });
+          if (sellerUser) {
+            if (!partnerEmail && sellerUser.email) partnerEmail = sellerUser.email.trim().toLowerCase();
+            if (!partnerName && sellerUser.name) partnerName = sellerUser.name;
+            if (!partnerPhone && sellerUser.mobile) partnerPhone = sellerUser.mobile;
+          }
+        } catch {}
+      }
+
+      // Fallback 2: Resolve from categorySpecs (snap property spotter info)
+      if (!partnerEmail && property.categorySpecs) {
+        try {
+          const specs = JSON.parse(property.categorySpecs);
+          if (specs?.spotterEmail) partnerEmail = specs.spotterEmail.trim().toLowerCase();
+          if (!partnerName && specs?.spotterName) partnerName = specs.spotterName;
+          if (!partnerPhone && specs?.spotterMobile) partnerPhone = specs.spotterMobile;
+        } catch {}
+      }
+
+      if (!partnerEmail) {
+        partnerEmail = 'partner@acresbazaar.com';
+      }
+      if (!partnerName) {
+        partnerName = 'Community Partner';
+      }
+
+      const partnerRole = 'PARTNER';
+
+      let awardedWallet: any = null;
 
       await this.prisma.$transaction(async (tx) => {
         // Find or create Partner Wallet
@@ -716,7 +749,7 @@ export class PropertiesService {
             data: {
               partnerEmail,
               partnerName,
-              partnerPhone: property.sellerPhone,
+              partnerPhone,
               partnerRole,
               availablePoints: pointsToAward,
               reservedPoints: 0,
@@ -730,11 +763,13 @@ export class PropertiesService {
             data: {
               availablePoints: { increment: pointsToAward },
               totalEarnedPoints: { increment: pointsToAward },
-              ...(property.sellerName ? { partnerName: property.sellerName } : {}),
-              ...(property.sellerPhone ? { partnerPhone: property.sellerPhone } : {})
+              ...(partnerName ? { partnerName } : {}),
+              ...(partnerPhone ? { partnerPhone } : {})
             }
           });
         }
+
+        awardedWallet = wallet;
 
         // Add Points Ledger transaction
         await tx.pointsLedger.create({
@@ -759,26 +794,28 @@ export class PropertiesService {
           where: { id: propertyId },
           data: { pointsAwarded: true }
         });
-
-        // Legacy reward record
-        try {
-          await tx.reward.create({
-            data: {
-              userName: partnerName,
-              userEmail: partnerEmail,
-              userRole: partnerRole,
-              propertyTitle: property.title,
-              rewardTitle: 'Property Approved Reward',
-              points: pointsToAward,
-              amount: pointsToAward,
-              reason: `Property "${property.title}" approved by Admin. +${pointsToAward} points added.`,
-              status: 'APPROVED'
-            }
-          });
-        } catch (e) {
-          // ignore legacy duplicate log
-        }
       });
+
+      // Legacy reward record (created outside transaction to prevent transaction aborts)
+      try {
+        await this.prisma.reward.create({
+          data: {
+            userName: partnerName,
+            userEmail: partnerEmail,
+            userRole: property.sellerRole || 'COMMON_PEOPLE',
+            propertyTitle: property.title,
+            rewardTitle: 'Property Approved Reward',
+            points: pointsToAward,
+            amount: pointsToAward,
+            reason: `Property "${property.title}" approved by Admin. +${pointsToAward} points added.`,
+            status: 'APPROVED'
+          }
+        });
+      } catch (e) {
+        // Ignore legacy record errors
+      }
+
+      console.log(`[Points Awarded] +${pointsToAward} points awarded to partner ${partnerEmail} for approved property ${property.id}`);
     } catch (err) {
       console.error('Failed to award property approval points:', err);
     }

@@ -16,6 +16,17 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 }
 
 @Injectable()
+export class OptionalJwtAuthGuard extends AuthGuard('jwt') {
+  canActivate(context: ExecutionContext) {
+    return super.canActivate(context);
+  }
+
+  handleRequest(err: any, user: any) {
+    return user || null;
+  }
+}
+
+@Injectable()
 export class AdminGuard extends AuthGuard('jwt') {
   handleRequest(err: any, user: any) {
     if (err || !user || user.type !== 'admin') {
