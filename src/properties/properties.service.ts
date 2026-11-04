@@ -3,6 +3,66 @@ import { PrismaService } from '../prisma/prisma.service';
 import * as fs from 'fs';
 import * as path from 'path';
 
+export function parseAndFormatIndianPrice(input: any): { numericPrice: number; priceDisplay: string } {
+  if (typeof input === 'number') {
+    const num = isNaN(input) ? 0 : Math.round(input);
+    return {
+      numericPrice: num,
+      priceDisplay: num > 0 ? `₹${num.toLocaleString('en-IN')}` : 'Price on Request'
+    };
+  }
+
+  const str = String(input || '').trim();
+  if (!str) {
+    return { numericPrice: 0, priceDisplay: 'Price on Request' };
+  }
+
+  // Check for Cr / Crore (e.g., 1.5 Cr, 1Cr, 2 Crore)
+  const crMatch = str.match(/([\d.]+)\s*(cr|crore|crores)\b/i);
+  if (crMatch) {
+    const val = Math.round(parseFloat(crMatch[1]) * 10000000);
+    return {
+      numericPrice: val,
+      priceDisplay: `₹${val.toLocaleString('en-IN')}`
+    };
+  }
+
+  // Check for L / Lakh / Lac (e.g., 50 L, 50L, 50 Lakh, 50 Lac)
+  const lakhMatch = str.match(/([\d.]+)\s*(l|lakh|lakhs|lac|lacs)\b/i);
+  if (lakhMatch) {
+    const val = Math.round(parseFloat(lakhMatch[1]) * 100000);
+    return {
+      numericPrice: val,
+      priceDisplay: `₹${val.toLocaleString('en-IN')}`
+    };
+  }
+
+  // Check for K / Thousand (e.g., 25 K, 25K, 25 Thousand)
+  const kMatch = str.match(/([\d.]+)\s*(k|thousand|thousands)\b/i);
+  if (kMatch) {
+    const val = Math.round(parseFloat(kMatch[1]) * 1000);
+    return {
+      numericPrice: val,
+      priceDisplay: `₹${val.toLocaleString('en-IN')}`
+    };
+  }
+
+  // Direct numeric value (e.g. "15000000", "₹1,50,00,000", "$15,000,000")
+  const numOnly = parseFloat(str.replace(/[^0-9.]/g, ''));
+  if (!isNaN(numOnly) && numOnly > 0) {
+    const val = Math.round(numOnly);
+    return {
+      numericPrice: val,
+      priceDisplay: `₹${val.toLocaleString('en-IN')}`
+    };
+  }
+
+  return {
+    numericPrice: 0,
+    priceDisplay: str.startsWith('₹') ? str : (str ? `₹${str}` : 'Price on Request')
+  };
+}
+
 function getCategoryFallbackImage(category?: string): string {
   const cat = (category || '').toLowerCase();
   if (cat.includes('plot') || cat.includes('land')) {
@@ -497,27 +557,12 @@ export class PropertiesService {
       throw new BadRequestException('Title, category, and location/city are required');
     }
 
-    // Robust real-estate price parser (supports numbers, formatted commas, Cr, Lakh, etc.)
-    let cleanPrice = 0;
-    if (typeof data.price === 'number') {
-      cleanPrice = isNaN(data.price) ? 0 : data.price;
-    } else if (data.price !== undefined && data.price !== null) {
-      const priceStr = String(data.price).trim().toLowerCase();
-      const numPart = parseFloat(priceStr.replace(/[^0-9.]/g, '')) || 0;
-      if (priceStr.includes('cr') || priceStr.includes('crore')) {
-        cleanPrice = Math.round(numPart * 10000000);
-      } else if (priceStr.includes('lakh') || priceStr.includes('lac')) {
-        cleanPrice = Math.round(numPart * 100000);
-      } else if (priceStr.includes('k')) {
-        cleanPrice = Math.round(numPart * 1000);
-      } else {
-        cleanPrice = numPart;
-      }
-    }
-
-    const priceDisplay = (data.priceDisplay && data.priceDisplay.trim())
-      ? data.priceDisplay.trim()
-      : (cleanPrice > 0 ? `₹${cleanPrice.toLocaleString('en-IN')}` : 'Price on Request');
+    // Robust Indian real-estate price parser (supports Cr, L, K, exact ₹, and numeric commas)
+    const parsedPrice = parseAndFormatIndianPrice(data.price);
+    const cleanPrice = parsedPrice.numericPrice;
+    const priceDisplay = (data.priceDisplay && !data.priceDisplay.startsWith('$'))
+      ? (data.priceDisplay.startsWith('₹') ? data.priceDisplay.trim() : `₹${data.priceDisplay.trim()}`)
+      : parsedPrice.priceDisplay;
 
     const status = (data.status || 'PENDING').toUpperCase().trim();
     
@@ -991,6 +1036,16 @@ export class PropertiesService {
       }
     }
 
+    let priceUpdate: any = {};
+    if (data.price !== undefined && data.price !== null && String(data.price).trim() !== '') {
+      const parsed = parseAndFormatIndianPrice(data.price);
+      priceUpdate.price = parsed.numericPrice;
+      priceUpdate.priceDisplay = parsed.priceDisplay;
+    }
+    if (data.priceDisplay && !data.priceDisplay.startsWith('$')) {
+      priceUpdate.priceDisplay = data.priceDisplay.startsWith('₹') ? data.priceDisplay.trim() : `₹${data.priceDisplay.trim()}`;
+    }
+
     const updated = await this.prisma.property.update({
       where: { id },
       data: {
@@ -998,8 +1053,7 @@ export class PropertiesService {
         ...(data.category ? { category: data.category.trim() } : {}),
         ...(data.location ? { location: data.location.trim() } : {}),
         ...(data.city ? { city: data.city.trim() } : {}),
-        ...(data.price !== undefined ? { price: Number(data.price) } : {}),
-        ...(data.priceDisplay ? { priceDisplay: data.priceDisplay } : {}),
+        ...priceUpdate,
         ...(data.description !== undefined ? { description: data.description } : {}),
         ...(data.planType ? { planType: data.planType.toUpperCase() } : {}),
         ...(data.status ? { status: data.status.toUpperCase() } : {}),

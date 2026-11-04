@@ -11,7 +11,57 @@ export class CategoriesService {
       where,
       orderBy: { displayOrder: 'asc' }
     });
-    return { success: true, count: categories.length, categories };
+
+    // Fetch approved properties to compute accurate dynamic category count
+    const approvedProperties = await this.prisma.property.findMany({
+      where: { status: 'APPROVED' },
+      select: { category: true }
+    });
+
+    const categoriesWithCount = categories.map(cat => {
+      const catLower = cat.name.toLowerCase();
+      const slugLower = cat.slug.toLowerCase();
+
+      const count = approvedProperties.filter(p => {
+        const pCat = (p.category || '').toLowerCase().trim();
+        if (!pCat) return false;
+        if (pCat === catLower || pCat === slugLower) return true;
+
+        if (slugLower.includes('plot') || catLower.includes('plot')) {
+          return (pCat.includes('plot') || pCat.includes('land')) && !pCat.includes('farm');
+        }
+        if (slugLower.includes('villa') || catLower.includes('villa')) {
+          return pCat.includes('villa');
+        }
+        if (slugLower.includes('apartment') || slugLower.includes('flat') || catLower.includes('apartment') || catLower.includes('flat')) {
+          return pCat.includes('apartment') || pCat.includes('flat');
+        }
+        if (slugLower.includes('house') || catLower.includes('house') || slugLower.includes('independent') || catLower.includes('independent')) {
+          return pCat.includes('house') || pCat.includes('independent');
+        }
+        if (slugLower.includes('commercial') || catLower.includes('commercial')) {
+          return pCat.includes('commercial') || pCat.includes('office') || pCat.includes('shop');
+        }
+        if (slugLower.includes('farm') || catLower.includes('farm')) {
+          return pCat.includes('farm') || pCat.includes('agriculture');
+        }
+        if (slugLower.includes('layout') || catLower.includes('layout')) {
+          return pCat.includes('layout');
+        }
+        if (slugLower.includes('residential') || catLower.includes('residential')) {
+          return pCat.includes('residential') || pCat.includes('apartment') || pCat.includes('villa') || pCat.includes('house');
+        }
+
+        return pCat.includes(slugLower) || pCat.includes(catLower) || slugLower.includes(pCat) || catLower.includes(pCat);
+      }).length;
+
+      return {
+        ...cat,
+        propertiesCount: count
+      };
+    });
+
+    return { success: true, count: categoriesWithCount.length, categories: categoriesWithCount };
   }
 
   async findOne(id: string) {
