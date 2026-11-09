@@ -21,6 +21,7 @@ import { ExportModule } from './export/export.module';
 import { ActivitiesModule } from './activities/activities.module';
 import { StaffModule } from './staff/staff.module';
 import { BannersModule } from './banners/banners.module';
+import { WhatsappModule } from './whatsapp/whatsapp.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { BannersModule } from './banners/banners.module';
       },
     ]),
     PrismaModule,
+    WhatsappModule,
     AuthModule,
     DashboardModule,
     CustomersModule,

@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { WhatsappService } from '../whatsapp/whatsapp.service';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -338,7 +339,10 @@ function extractOwnerContact(property: any) {
 
 @Injectable()
 export class PropertiesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private whatsappService: WhatsappService
+  ) {}
 
   // 1. Find all properties for Admin with filters (status: ALL, PENDING, APPROVED, REJECTED, HOLD)
   async findAllAdmin(query: { status?: string; category?: string; search?: string; role?: string; isSnap?: string; planType?: string }) {
@@ -720,6 +724,9 @@ export class PropertiesService {
       }
     });
 
+    // Notify Admin via WhatsApp about the new property submission
+    this.whatsappService.notifyPropertyUploaded(property).catch(() => {});
+
     const vids = extractPropertyVideos(property);
     return {
       success: true,
@@ -861,6 +868,20 @@ export class PropertiesService {
       }
 
       console.log(`[Points Awarded] +${pointsToAward} points awarded to partner ${partnerEmail} for approved property ${property.id}`);
+
+      // Notify Partner via WhatsApp: Property approved & points credited!
+      if (partnerPhone) {
+        this.whatsappService.notifyPartnerPointsAwarded({
+          name: partnerName || 'Partner',
+          phone: partnerPhone,
+          email: partnerEmail,
+          role: partnerRole,
+          propertyTitle: property.title,
+          propertyId: property.id,
+          pointsAwarded: pointsToAward,
+          newAvailableBalance: awardedWallet?.availablePoints || pointsToAward
+        }).catch(() => {});
+      }
     } catch (err) {
       console.error('Failed to award property approval points:', err);
     }
@@ -890,6 +911,8 @@ export class PropertiesService {
     // Award +20 points ONLY when status is APPROVED for the first time
     if (cleanStatus === 'APPROVED') {
       await this.awardApprovalPointsIdempotent(id, adminUser);
+      // Notify Seller that their listing is approved and live
+      this.whatsappService.notifySellerPropertyApproved(updated).catch(() => {});
     }
 
     return {

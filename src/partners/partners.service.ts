@@ -1,9 +1,13 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { WhatsappService } from '../whatsapp/whatsapp.service';
 
 @Injectable()
 export class PartnersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private whatsappService: WhatsappService
+  ) {}
 
   async findAll(status?: string) {
     // Accept VERIFIED as alias for APPROVED in filter
@@ -40,6 +44,14 @@ export class PartnersService {
       }
     });
 
+    // Notify Admin via WhatsApp
+    this.whatsappService.notifyUserRegistration({
+      name: partner.name,
+      email: partner.email,
+      mobile: partner.mobile,
+      role: `PARTNER (${partner.type || 'Broker'})`
+    }).catch(() => {});
+
     return { success: true, message: 'Partner registration submitted for verification', partner };
   }
 
@@ -55,6 +67,17 @@ export class PartnersService {
       where: { id },
       data: { status: clean }
     });
+
+    // When Admin approves partner/dealer, notify them via WhatsApp
+    if (clean === 'APPROVED') {
+      this.whatsappService.notifyPartnerOrDealerApproved({
+        name: updated.name,
+        phone: updated.mobile,
+        email: updated.email,
+        type: updated.type,
+        company: updated.company || ''
+      }).catch(() => {});
+    }
 
     // Return status as VERIFIED when APPROVED so admin panel displays correctly
     return { success: true, message: `Partner status updated to ${clean}`, partner: { ...updated, status: updated.status === 'APPROVED' ? 'VERIFIED' : updated.status } };

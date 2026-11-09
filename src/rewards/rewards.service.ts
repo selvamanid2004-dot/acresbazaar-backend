@@ -1,9 +1,13 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { WhatsappService } from '../whatsapp/whatsapp.service';
 
 @Injectable()
 export class RewardsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private whatsappService: WhatsappService
+  ) {}
 
   // =========================================================================
   // 1. REWARD CONVERSION CONFIGURATION
@@ -453,7 +457,7 @@ export class RewardsService {
       throw new ForbiddenException('Access denied. Sellers are not authorized to claim Partner rewards.');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       // 1. Get wallet
       const wallet = await tx.partnerWallet.findUnique({
         where: { partnerEmail: cleanEmail },
@@ -613,6 +617,13 @@ export class RewardsService {
         }
       };
     }, { maxWait: 10000, timeout: 20000 });
+
+    // Notify Admin via WhatsApp about the new Reward Claim
+    if (result?.claim) {
+      this.whatsappService.notifyRewardClaimSubmitted(result.claim).catch(() => {});
+    }
+
+    return result;
   }
 
   // =========================================================================
@@ -790,7 +801,7 @@ export class RewardsService {
       throw new BadRequestException(`Status must be one of: ${validStatuses.join(', ')}`);
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const claim = await tx.rewardClaim.findUnique({
         where: { id: claimId }
       });
@@ -969,6 +980,13 @@ export class RewardsService {
         };
       }
     }, { maxWait: 10000, timeout: 20000 });
+
+    // Notify Partner via WhatsApp about their payout status (PAID or REJECTED)
+    if (result?.claim) {
+      this.whatsappService.notifyRewardClaimStatusUpdate(result.claim, newStatus, data.adminNotes).catch(() => {});
+    }
+
+    return result;
   }
 
   // =========================================================================

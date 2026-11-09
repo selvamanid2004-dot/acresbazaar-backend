@@ -1,13 +1,15 @@
 import { Injectable, UnauthorizedException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
+import { WhatsappService } from '../whatsapp/whatsapp.service';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class AuthService {
   constructor(
     private prisma: PrismaService,
-    private jwtService: JwtService
+    private jwtService: JwtService,
+    private whatsappService: WhatsappService
   ) {}
 
   // 1. Admin Login
@@ -151,6 +153,14 @@ export class AuthService {
         isActive: true
       }
     });
+
+    // Send automated WhatsApp notification to Admin (fire & forget)
+    this.whatsappService.notifyUserRegistration({
+      name: user.name,
+      email: user.email,
+      mobile: user.mobile,
+      role: user.role
+    }).catch(() => {});
 
     const payload = {
       sub: user.id,
