@@ -236,7 +236,7 @@ export class RewardsService {
         availablePoints: wallet.availablePoints,
         ledger: ledgerEntry
       };
-    });
+    }, { maxWait: 10000, timeout: 20000 });
   }
 
   // =========================================================================
@@ -612,7 +612,7 @@ export class RewardsService {
           totalRedeemedPoints: updatedWallet.totalRedeemedPoints
         }
       };
-    });
+    }, { maxWait: 10000, timeout: 20000 });
   }
 
   // =========================================================================
@@ -968,7 +968,7 @@ export class RewardsService {
           claim: updatedClaim
         };
       }
-    });
+    }, { maxWait: 10000, timeout: 20000 });
   }
 
   // =========================================================================

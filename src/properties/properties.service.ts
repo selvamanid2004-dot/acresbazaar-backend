@@ -839,7 +839,7 @@ export class PropertiesService {
           where: { id: propertyId },
           data: { pointsAwarded: true }
         });
-      });
+      }, { maxWait: 10000, timeout: 20000 });
 
       // Legacy reward record (created outside transaction to prevent transaction aborts)
       try {

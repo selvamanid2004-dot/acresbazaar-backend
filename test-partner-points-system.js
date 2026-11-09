@@ -146,7 +146,7 @@ async function runTests() {
           description: `Reward Claim #${claimNumber} Submitted: ${pointsToRedeem} Points Reserved for ₹${rewardAmount} Payout`
         }
       });
-    });
+    }, { maxWait: 10000, timeout: 20000 });
 
     wallet = await prisma.partnerWallet.findUnique({ where: { partnerEmail: testEmail } });
     console.log(`   ✓ Claim #${claimNumber} Created as PENDING!`);
@@ -192,7 +192,7 @@ async function runTests() {
           description: `Reward Claim #${claimNumber} Paid: ₹${rewardAmount} disbursed via UTR Ref #${paymentRef}`
         }
       });
-    });
+    }, { maxWait: 10000, timeout: 20000 });
 
     wallet = await prisma.partnerWallet.findUnique({ where: { partnerEmail: testEmail } });
     console.log(`   ✓ Claim Status: PAID`);
@@ -261,7 +261,7 @@ async function runTests() {
           description: `Reward Claim #${claim2Number} Rejected. 520 Points Released to Available Wallet.`
         }
       });
-    });
+    }, { maxWait: 10000, timeout: 20000 });
 
     wallet = await prisma.partnerWallet.findUnique({ where: { partnerEmail: testEmail } });
     console.log(`   ✓ Reserved points released back! Available: ${wallet.availablePoints} Pts | Reserved: ${wallet.reservedPoints} Pts.`);
